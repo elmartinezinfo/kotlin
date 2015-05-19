@@ -25,7 +25,9 @@ import org.jetbrains.kotlin.descriptors.PackageFragmentProvider;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.psi.JetClassOrObject;
 import org.jetbrains.kotlin.psi.JetDeclaration;
+import org.jetbrains.kotlin.psi.JetNamedFunction;
 import org.jetbrains.kotlin.resolve.BindingContext;
+import org.jetbrains.kotlin.resolve.BindingTrace;
 
 import java.util.Collection;
 
@@ -42,6 +44,9 @@ public interface KotlinCodeAnalyzer extends TopLevelDescriptorProvider {
 
     @NotNull
     DeclarationDescriptor resolveToDescriptor(@NotNull JetDeclaration declaration);
+
+    @NotNull
+    BindingTrace resolveFunction(@NotNull JetNamedFunction function);
 
     @NotNull
     ScopeProvider getScopeProvider();

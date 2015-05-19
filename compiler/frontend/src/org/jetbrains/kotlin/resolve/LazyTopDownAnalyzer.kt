@@ -276,7 +276,15 @@ public class LazyTopDownAnalyzer {
 
         val bprofiler = Profiler.create("Body resolve")
         bprofiler.start()
-        bodyResolver!!.resolveBodies(c)
+        bodyResolver!!.resolveBodies(c) {
+//            bodyResolver!!.resolveFunctionBodies(c)
+            for ((declaration, descriptor) in c.getFunctions().entrySet()) {
+                val bindingTrace = (topLevelDescriptorProvider as KotlinCodeAnalyzer).resolveFunction(declaration)
+                (bindingTrace as DelegatingBindingTrace).addAllMyDataTo(trace!!)
+
+                assert(descriptor.getReturnType() != null)
+            }
+        }
 
         bprofiler.end()
 

@@ -70,16 +70,17 @@ import org.jetbrains.kotlin.resolve.StatementFilter;
 import org.jetbrains.kotlin.resolve.calls.CallCompleter;
 import org.jetbrains.kotlin.resolve.calls.CandidateResolver;
 import org.jetbrains.kotlin.resolve.calls.tasks.TaskPrioritizer;
-import org.jetbrains.kotlin.psi.JetImportsFactory;
-import org.jetbrains.kotlin.resolve.lazy.LazyDeclarationResolver;
-import org.jetbrains.kotlin.resolve.lazy.DeclarationScopeProviderImpl;
-import org.jetbrains.kotlin.resolve.ScriptBodyResolver;
-import org.jetbrains.kotlin.resolve.lazy.ScopeProvider.AdditionalFileScopeProvider;
+import org.jetbrains.kotlin.resolve.BodyResolveTaskManager;
 import org.jetbrains.kotlin.resolve.BodyResolver;
 import org.jetbrains.kotlin.resolve.ControlFlowAnalyzer;
 import org.jetbrains.kotlin.resolve.DeclarationsChecker;
 import org.jetbrains.kotlin.resolve.ModifiersChecker;
 import org.jetbrains.kotlin.resolve.FunctionAnalyzerExtension;
+import org.jetbrains.kotlin.resolve.ScriptBodyResolver;
+import org.jetbrains.kotlin.resolve.lazy.LazyDeclarationResolver;
+import org.jetbrains.kotlin.resolve.lazy.DeclarationScopeProviderImpl;
+import org.jetbrains.kotlin.psi.JetImportsFactory;
+import org.jetbrains.kotlin.resolve.lazy.ScopeProvider.AdditionalFileScopeProvider;
 import org.jetbrains.kotlin.resolve.DeclarationResolver;
 import org.jetbrains.kotlin.resolve.OverloadResolver;
 import org.jetbrains.kotlin.resolve.OverrideResolver;
@@ -150,16 +151,17 @@ public class InjectorForTopDownAnalyzerForJvm {
     private final CallCompleter callCompleter;
     private final CandidateResolver candidateResolver;
     private final TaskPrioritizer taskPrioritizer;
-    private final JetImportsFactory jetImportsFactory;
-    private final LazyDeclarationResolver lazyDeclarationResolver;
-    private final DeclarationScopeProviderImpl declarationScopeProvider;
-    private final ScriptBodyResolver scriptBodyResolver;
-    private final AdditionalFileScopeProvider additionalFileScopeProvider;
+    private final BodyResolveTaskManager bodyResolveTaskManager;
     private final BodyResolver bodyResolver;
     private final ControlFlowAnalyzer controlFlowAnalyzer;
     private final DeclarationsChecker declarationsChecker;
     private final ModifiersChecker modifiersChecker;
     private final FunctionAnalyzerExtension functionAnalyzerExtension;
+    private final ScriptBodyResolver scriptBodyResolver;
+    private final LazyDeclarationResolver lazyDeclarationResolver;
+    private final DeclarationScopeProviderImpl declarationScopeProvider;
+    private final JetImportsFactory jetImportsFactory;
+    private final AdditionalFileScopeProvider additionalFileScopeProvider;
     private final DeclarationResolver declarationResolver;
     private final OverloadResolver overloadResolver;
     private final OverrideResolver overrideResolver;
@@ -235,22 +237,24 @@ public class InjectorForTopDownAnalyzerForJvm {
         this.candidateResolver = new CandidateResolver();
         this.callCompleter = new CallCompleter(argumentTypeResolver, candidateResolver);
         this.taskPrioritizer = new TaskPrioritizer(storageManager);
-        this.jetImportsFactory = new JetImportsFactory();
-        this.lazyDeclarationResolver = new LazyDeclarationResolver(getModuleContext(), bindingTrace);
-        this.declarationScopeProvider = new DeclarationScopeProviderImpl(lazyDeclarationResolver);
-        this.scriptBodyResolver = new ScriptBodyResolver();
-        this.additionalFileScopeProvider = new AdditionalFileScopeProvider();
+        this.bodyResolveTaskManager = new BodyResolveTaskManager();
         this.bodyResolver = new BodyResolver();
         this.controlFlowAnalyzer = new ControlFlowAnalyzer();
         this.declarationsChecker = new DeclarationsChecker();
         this.modifiersChecker = new ModifiersChecker(bindingTrace, kotlinJvmCheckerProvider);
         this.functionAnalyzerExtension = new FunctionAnalyzerExtension();
+        this.scriptBodyResolver = new ScriptBodyResolver();
+        this.lazyDeclarationResolver = new LazyDeclarationResolver(getModuleContext(), bindingTrace);
+        this.declarationScopeProvider = new DeclarationScopeProviderImpl(lazyDeclarationResolver);
+        this.jetImportsFactory = new JetImportsFactory();
+        this.additionalFileScopeProvider = new AdditionalFileScopeProvider();
         this.declarationResolver = new DeclarationResolver();
         this.overloadResolver = new OverloadResolver();
         this.overrideResolver = new OverrideResolver();
         this.varianceChecker = new VarianceChecker(bindingTrace);
 
         this.resolveSession.setAnnotationResolve(annotationResolver);
+        this.resolveSession.setBodyResolveTaskManager(bodyResolveTaskManager);
         this.resolveSession.setDescriptorResolver(descriptorResolver);
         this.resolveSession.setFunctionDescriptorResolver(functionDescriptorResolver);
         this.resolveSession.setJetImportFactory(jetImportsFactory);
@@ -359,15 +363,11 @@ public class InjectorForTopDownAnalyzerForJvm {
 
         candidateResolver.setArgumentTypeResolver(argumentTypeResolver);
 
-        jetImportsFactory.setProject(project);
-
-        lazyDeclarationResolver.setDeclarationScopeProvider(declarationScopeProvider);
-        lazyDeclarationResolver.setTopLevelDescriptorProvider(resolveSession);
-
-        declarationScopeProvider.setFileScopeProvider(scopeProvider);
-
-        scriptBodyResolver.setAdditionalCheckerProvider(kotlinJvmCheckerProvider);
-        scriptBodyResolver.setExpressionTypingServices(expressionTypingServices);
+        bodyResolveTaskManager.setBodyResolver(bodyResolver);
+        bodyResolveTaskManager.setDeclarationScopeProvider(scopeProvider);
+        bodyResolveTaskManager.setLazyDeclarationResolver(lazyDeclarationResolver);
+        bodyResolveTaskManager.setStorageManager(storageManager);
+        bodyResolveTaskManager.setTrace(bindingTrace);
 
         bodyResolver.setAdditionalCheckerProvider(kotlinJvmCheckerProvider);
         bodyResolver.setAnnotationResolver(annotationResolver);
@@ -389,6 +389,16 @@ public class InjectorForTopDownAnalyzerForJvm {
 
         functionAnalyzerExtension.setTrace(bindingTrace);
 
+        scriptBodyResolver.setAdditionalCheckerProvider(kotlinJvmCheckerProvider);
+        scriptBodyResolver.setExpressionTypingServices(expressionTypingServices);
+
+        lazyDeclarationResolver.setDeclarationScopeProvider(declarationScopeProvider);
+        lazyDeclarationResolver.setTopLevelDescriptorProvider(resolveSession);
+
+        declarationScopeProvider.setFileScopeProvider(scopeProvider);
+
+        jetImportsFactory.setProject(project);
+
         declarationResolver.setAnnotationResolver(annotationResolver);
         declarationResolver.setTrace(bindingTrace);
 
@@ -401,6 +411,8 @@ public class InjectorForTopDownAnalyzerForJvm {
         javaClassFinder.initialize();
 
         javaLazyAnalyzerPostConstruct.postCreate();
+
+        bodyResolveTaskManager.init();
 
     }
 

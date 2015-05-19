@@ -43,9 +43,7 @@ import org.jetbrains.kotlin.resolve.scopes.JetScope
 import org.jetbrains.kotlin.types.TypeUtils
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 
-public abstract class ElementResolver protected(
-        public val resolveSession: ResolveSession
-) {
+public abstract class ElementResolver protected(public val resolveSession: ResolveSession) {
 
     public open fun getElementAdditionalResolve(jetElement: JetElement): BindingContext {
         return performElementAdditionalResolve(jetElement, jetElement, BodyResolveMode.FULL)
@@ -121,7 +119,13 @@ public abstract class ElementResolver protected(
             StatementFilter.NONE
 
         val trace : BindingTrace = when (resolveElement) {
-            is JetNamedFunction -> functionAdditionalResolve(resolveSession, resolveElement, file, statementFilter)
+            is JetNamedFunction ->
+                if (bodyResolveMode == BodyResolveMode.FULL) {
+                    resolveSession.resolveFunction(resolveElement)
+                }
+                else {
+                    functionAdditionalResolve(resolveSession, resolveElement, file, statementFilter)
+                }
 
             is JetClassInitializer -> initializerAdditionalResolve(resolveSession, resolveElement, file, statementFilter)
 

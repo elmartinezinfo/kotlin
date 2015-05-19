@@ -26,6 +26,7 @@ import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilPackage;
 import org.jetbrains.kotlin.resolve.BindingContext;
 import org.jetbrains.kotlin.resolve.BindingContextUtils;
+import org.jetbrains.kotlin.resolve.BindingTrace;
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode;
 import org.jetbrains.kotlin.resolve.lazy.KotlinCodeAnalyzer;
 import org.jetbrains.kotlin.resolve.lazy.ResolveSession;
@@ -85,6 +86,12 @@ public class ResolveSessionForBodies implements KotlinCodeAnalyzer {
         return BindingContextUtils.getNotNull(context, BindingContext.DECLARATION_TO_DESCRIPTOR, declaration,
                                               "Descriptor wasn't found for declaration " + declaration.toString() + "\n" +
                                               PsiUtilPackage.getElementTextWithContext(declaration));
+    }
+
+    @NotNull
+    @Override
+    public BindingTrace resolveFunction(@NotNull JetNamedFunction function) {
+        return resolveSession.resolveFunction(function);
     }
 
     @Override

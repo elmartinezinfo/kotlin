@@ -121,8 +121,13 @@ public class BodyResolver {
         this.valueParameterResolver = valueParameterResolver;
     }
 
-    private void resolveBehaviorDeclarationBodies(@NotNull BodiesResolveContext c) {
-        Profiler profiler1 = Profiler.create("1111");
+    //@Inject
+    //public void setBodyResolveTaskManager(BodyResolveTaskManager bodyResolveTaskManager) {
+    //    this.bodyResolveTaskManager = bodyResolveTaskManager;
+    //}
+
+    private void resolveBehaviorDeclarationBodies(@NotNull BodiesResolveContext c, Function0<Unit> resolveBodiesFun) {
+        Profiler profiler1 = Profiler.create("Body resolve one 1111");
         profiler1.start();
         resolveDelegationSpecifierLists(c);
 
@@ -133,19 +138,23 @@ public class BodyResolver {
         resolveSecondaryConstructors(c);
         profiler1.end();
 
-        Profiler profiler2 = Profiler.create("2222");
+        Profiler profiler2 = Profiler.create("Body resolve one 2222");
         profiler2.start();
-        resolveFunctionBodies(c);
+        // resolveFunctionBodies(c);
+
+        // Temp
+        resolveBodiesFun.invoke();
+
         profiler2.end();
 
-        Profiler profiler3 = Profiler.create("3333");
+        Profiler profiler3 = Profiler.create("Body resolve one 3333");
         profiler3.start();
         // SCRIPT: resolve script bodies
         scriptBodyResolverResolver.resolveScriptBodies(c);
         profiler3.end();
 
         if (!c.getTopDownAnalysisMode().getIsLocalDeclarations()) {
-            Profiler profiler4 = Profiler.create("4444");
+            Profiler profiler4 = Profiler.create("Body resolve one 4444");
             profiler4.start();
             computeDeferredTypes();
             profiler4.end();
@@ -263,23 +272,23 @@ public class BodyResolver {
         return call == null || !call.getStatus().isSuccess() ? null : call.getResultingDescriptor().getOriginal();
     }
 
-    public void resolveBodies(@NotNull BodiesResolveContext c) {
-        Profiler profiler1 = Profiler.create("one");
+    public void resolveBodies(@NotNull BodiesResolveContext c, Function0<Unit> resolveBodiesFun) {
+        Profiler profiler1 = Profiler.create("Body resolve one");
         profiler1.start();
-        resolveBehaviorDeclarationBodies(c);
+        resolveBehaviorDeclarationBodies(c, resolveBodiesFun);
         profiler1.end();
 
-        Profiler profiler2 = Profiler.create("two");
+        Profiler profiler2 = Profiler.create("Body resolve two");
         profiler2.start();
         controlFlowAnalyzer.process(c);
         profiler2.end();
 
-        Profiler profiler3 = Profiler.create("three");
+        Profiler profiler3 = Profiler.create("Body resolve three");
         profiler3.start();
         declarationsChecker.process(c);
         profiler3.end();
 
-        Profiler profiler4 = Profiler.create("four");
+        Profiler profiler4 = Profiler.create("Body resolve four");
         profiler4.start();
         functionAnalyzerExtension.process(c);
         profiler4.end();
@@ -735,12 +744,12 @@ public class BodyResolver {
         return scope;
     }
 
-    private void resolveFunctionBodies(@NotNull BodiesResolveContext c) {
+    public void resolveFunctionBodies(@NotNull BodiesResolveContext c) {
         for (Map.Entry<JetNamedFunction, SimpleFunctionDescriptor> entry : c.getFunctions().entrySet()) {
             JetNamedFunction declaration = entry.getKey();
 
-            Profiler profiler = Profiler.create("Function: " + declaration.getName());
-            profiler.start();
+            //Profiler profiler = Profiler.create("Function: " + declaration.getName());
+            //profiler.start();
 
             SimpleFunctionDescriptor descriptor = entry.getValue();
 
@@ -753,7 +762,7 @@ public class BodyResolver {
 
             assert descriptor.getReturnType() != null;
 
-            profiler.end();
+            //profiler.end();
         }
     }
 
@@ -859,5 +868,4 @@ public class BodyResolver {
             }
         }
     }
-
 }

@@ -43,6 +43,7 @@ import org.jetbrains.kotlin.types.expressions.typeInfoFactory.TypeInfoFactoryPac
 import org.jetbrains.kotlin.util.Box;
 import org.jetbrains.kotlin.util.ReenteringLazyValueComputationException;
 import org.jetbrains.kotlin.util.slicedMap.WritableSlice;
+import org.jetbrains.kotlin.utils.Profiler;
 
 import javax.inject.Inject;
 import java.util.*;
@@ -121,6 +122,8 @@ public class BodyResolver {
     }
 
     private void resolveBehaviorDeclarationBodies(@NotNull BodiesResolveContext c) {
+        Profiler profiler1 = Profiler.create("1111");
+        profiler1.start();
         resolveDelegationSpecifierLists(c);
 
         resolvePropertyDeclarationBodies(c);
@@ -128,15 +131,27 @@ public class BodyResolver {
         resolveAnonymousInitializers(c);
         resolvePrimaryConstructorParameters(c);
         resolveSecondaryConstructors(c);
+        profiler1.end();
 
+        Profiler profiler2 = Profiler.create("2222");
+        profiler2.start();
         resolveFunctionBodies(c);
+        profiler2.end();
 
+        Profiler profiler3 = Profiler.create("3333");
+        profiler3.start();
         // SCRIPT: resolve script bodies
         scriptBodyResolverResolver.resolveScriptBodies(c);
+        profiler3.end();
 
         if (!c.getTopDownAnalysisMode().getIsLocalDeclarations()) {
+            Profiler profiler4 = Profiler.create("4444");
+            profiler4.start();
             computeDeferredTypes();
+            profiler4.end();
         }
+
+
     }
 
     private void resolveSecondaryConstructors(@NotNull BodiesResolveContext c) {
@@ -249,10 +264,25 @@ public class BodyResolver {
     }
 
     public void resolveBodies(@NotNull BodiesResolveContext c) {
+        Profiler profiler1 = Profiler.create("one");
+        profiler1.start();
         resolveBehaviorDeclarationBodies(c);
+        profiler1.end();
+
+        Profiler profiler2 = Profiler.create("two");
+        profiler2.start();
         controlFlowAnalyzer.process(c);
+        profiler2.end();
+
+        Profiler profiler3 = Profiler.create("three");
+        profiler3.start();
         declarationsChecker.process(c);
+        profiler3.end();
+
+        Profiler profiler4 = Profiler.create("four");
+        profiler4.start();
         functionAnalyzerExtension.process(c);
+        profiler4.end();
     }
 
     private void resolveDelegationSpecifierLists(@NotNull BodiesResolveContext c) {
@@ -699,7 +729,7 @@ public class BodyResolver {
     }
 
     @NotNull
-    private JetScope getScopeForProperty(@NotNull BodiesResolveContext c, @NotNull JetProperty property) {
+    private static JetScope getScopeForProperty(@NotNull BodiesResolveContext c, @NotNull JetProperty property) {
         JetScope scope = c.getDeclaringScope(property);
         assert scope != null : "Scope for property " + property.getText() + " should exists";
         return scope;
@@ -708,6 +738,10 @@ public class BodyResolver {
     private void resolveFunctionBodies(@NotNull BodiesResolveContext c) {
         for (Map.Entry<JetNamedFunction, SimpleFunctionDescriptor> entry : c.getFunctions().entrySet()) {
             JetNamedFunction declaration = entry.getKey();
+
+            Profiler profiler = Profiler.create("Function: " + declaration.getName());
+            profiler.start();
+
             SimpleFunctionDescriptor descriptor = entry.getValue();
 
             computeDeferredType(descriptor.getReturnType());
@@ -718,6 +752,8 @@ public class BodyResolver {
             resolveFunctionBody(c.getOuterDataFlowInfo(), trace, declaration, descriptor, declaringScope);
 
             assert descriptor.getReturnType() != null;
+
+            profiler.end();
         }
     }
 

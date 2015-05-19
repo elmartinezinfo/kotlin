@@ -18,6 +18,7 @@ package org.jetbrains.kotlin.resolve.lazy.descriptors;
 
 import com.google.common.collect.Sets;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor;
 import org.jetbrains.kotlin.descriptors.impl.AbstractLazyTypeParameterDescriptor;
 import org.jetbrains.kotlin.lexer.JetTokens;
 import org.jetbrains.kotlin.psi.*;
@@ -39,7 +40,7 @@ public class LazyTypeParameterDescriptor extends AbstractLazyTypeParameterDescri
 
     public LazyTypeParameterDescriptor(
             @NotNull LazyClassContext c,
-            @NotNull LazyClassDescriptor containingDeclaration,
+            @NotNull DeclarationDescriptor containingDeclaration,
             @NotNull JetTypeParameter jetTypeParameter,
             int index) {
         super(

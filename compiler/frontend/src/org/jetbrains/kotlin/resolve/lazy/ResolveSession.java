@@ -313,6 +313,21 @@ public class ResolveSession implements KotlinCodeAnalyzer, LazyClassContext {
         return lazyDeclarationResolver.resolveToDescriptor(declaration);
     }
 
+    public static class ResolveResult<T> {
+        private T value;
+
+        public ResolveResult(T value) {
+            this.value = value;
+        }
+
+        T result() { return value; }
+    }
+
+    @NotNull
+    public ResolveResult<BindingContext> resolveFunctionWithBody(@NotNull JetNamedFunction jetNamedFunction) {
+        return new ResolveResult<BindingContext>(null);
+    }
+
     @NotNull
     public Annotations getFileAnnotations(@NotNull JetFile file) {
         return fileAnnotations.invoke(file);

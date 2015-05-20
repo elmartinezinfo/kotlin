@@ -1,5 +1,6 @@
 // !DIAGNOSTICS: -UNUSED_PARAMETER -UNUSED_VARIABLE
-[file: Ann]
+<!DEPRECATED_ANNOTATION_SYNTAX!>[file: Ann]<!>
+@file:[Ann]
 annotation class Ann(val arg: Int = 1)
 
 fun bar(block: () -> Int) = block()
@@ -8,7 +9,7 @@ data class Q(val x: Int, val y: Int)
 
 fun bar2(): Array<Q> = null!!
 
-<!DEPRECATED_ANNOTATION_SYNTAX!>[Ann Ann]<!> class A [Ann] (<!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> val prop: Int) {
+<!DEPRECATED_ANNOTATION_SYNTAX!>[Ann Ann]<!> class A <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> constructor(<!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> val prop: Int) {
     <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> val x = 1
     <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> fun foo(<!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> x: Int) {
         <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> class B
@@ -22,9 +23,19 @@ fun bar2(): Array<Q> = null!!
 
     fun x(): <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> String {
         <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> val x: <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> String = ""
+
+        val localVal = <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> object {}
+
         return ""
     }
+
+    <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> object O1 {}
+    <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> companion object O2 {
+
+    }
 }
+
+<!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> object O3 {}
 
 val y: Array<[<!DEBUG_INFO_MISSING_UNRESOLVED!>Ann<!>] String?> = arrayOfNulls(1)
 val block: ([<!DEBUG_INFO_MISSING_UNRESOLVED!>Ann<!>] x: <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> String) -> <!DEPRECATED_ANNOTATION_SYNTAX!>[Ann]<!> String = { "" }

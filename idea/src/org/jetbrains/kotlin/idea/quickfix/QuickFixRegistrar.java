@@ -334,5 +334,14 @@ public class QuickFixRegistrar {
 
         QuickFixes.factories.put(ENUM_ENTRY_USES_DEPRECATED_OR_NO_DELIMITER, DeprecatedEnumEntryDelimiterSyntaxFix.Companion);
         QuickFixes.factories.put(ENUM_ENTRY_USES_DEPRECATED_OR_NO_DELIMITER, DeprecatedEnumEntryDelimiterSyntaxFix.Companion.createWholeProjectFixFactory());
+
+        QuickFixes.factories.put(MISSING_CONSTRUCTOR_KEYWORD, MissingConstructorKeywordFix.Companion);
+        QuickFixes.factories.put(MISSING_CONSTRUCTOR_KEYWORD, MissingConstructorKeywordFix.Companion.createWholeProjectFixFactory());
+
+        QuickFixes.factories.put(FUNCTION_EXPRESSION_WITH_NAME, RemoveNameFromFunctionExpressionFix.Companion);
+        QuickFixes.factories.put(FUNCTION_EXPRESSION_WITH_NAME, RemoveNameFromFunctionExpressionFix.Companion.createWholeProjectFixFactory());
+
+        QuickFixes.factories.put(UNRESOLVED_REFERENCE, ReplaceObsoleteLabelSyntaxFix.Companion);
+        QuickFixes.factories.put(UNRESOLVED_REFERENCE, ReplaceObsoleteLabelSyntaxFix.Companion.createWholeProjectFixFactory());
     }
 }

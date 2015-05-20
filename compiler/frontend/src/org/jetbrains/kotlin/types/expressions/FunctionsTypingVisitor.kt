@@ -26,6 +26,7 @@ import org.jetbrains.kotlin.descriptors.impl.SimpleFunctionDescriptorImpl
 import org.jetbrains.kotlin.diagnostics.DiagnosticUtils
 import org.jetbrains.kotlin.diagnostics.Errors.*
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.psiUtil.getAnnotationEntries
 import org.jetbrains.kotlin.resolve.*
 import org.jetbrains.kotlin.resolve.BindingContext.EXPECTED_RETURN_TYPE
 import org.jetbrains.kotlin.resolve.scopes.WritableScope
@@ -59,6 +60,11 @@ public class FunctionsTypingVisitor(facade: ExpressionTypingInternals) : Express
             if (!function.getTypeParameters().isEmpty()) {
                 context.trace.report(TYPE_PARAMETERS_NOT_ALLOWED.on(function))
             }
+
+            if (function.getName() != null) {
+                context.trace.report(FUNCTION_EXPRESSION_WITH_NAME.on(function.getNameIdentifier()))
+            }
+
             for (parameter in function.getValueParameters()) {
                 if (parameter.hasDefaultValue()) {
                     context.trace.report(FUNCTION_EXPRESSION_PARAMETER_WITH_DEFAULT_VALUE.on(parameter))
@@ -151,8 +157,11 @@ public class FunctionsTypingVisitor(facade: ExpressionTypingInternals) : Express
             context: ExpressionTypingContext
     ): AnonymousFunctionDescriptor {
         val functionLiteral = expression.getFunctionLiteral()
-        val functionDescriptor = AnonymousFunctionDescriptor(context.scope.getContainingDeclaration(), Annotations.EMPTY,
-                                                             CallableMemberDescriptor.Kind.DECLARATION, functionLiteral.toSourceElement())
+        val functionDescriptor = AnonymousFunctionDescriptor(
+            context.scope.getContainingDeclaration(),
+            components.annotationResolver.resolveAnnotationsWithArguments(context.scope, expression.getAnnotationEntries(), context.trace),
+            CallableMemberDescriptor.Kind.DECLARATION, functionLiteral.toSourceElement()
+        )
         components.functionDescriptorResolver.
                 initializeFunctionDescriptorAndExplicitReturnType(context.scope.getContainingDeclaration(), context.scope, functionLiteral,
                                                                   functionDescriptor, context.trace, context.expectedType)

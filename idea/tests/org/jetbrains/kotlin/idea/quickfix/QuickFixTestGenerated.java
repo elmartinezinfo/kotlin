@@ -3280,6 +3280,57 @@ public class QuickFixTestGenerated extends AbstractQuickFixTest {
             }
         }
 
+        @TestMetadata("idea/testData/quickfix/migration/missingConstructorKeyword")
+        @TestDataPath("$PROJECT_ROOT")
+        @RunWith(JUnit3RunnerWithInners.class)
+        public static class MissingConstructorKeyword extends AbstractQuickFixTest {
+            public void testAllFilesPresentInMissingConstructorKeyword() throws Exception {
+                JetTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/quickfix/migration/missingConstructorKeyword"), Pattern.compile("^(\\w+)\\.kt$"), true);
+            }
+
+            @TestMetadata("basic.kt")
+            public void testBasic() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/migration/missingConstructorKeyword/basic.kt");
+                doTest(fileName);
+            }
+        }
+
+        @TestMetadata("idea/testData/quickfix/migration/obsoleteLabelSyntax")
+        @TestDataPath("$PROJECT_ROOT")
+        @RunWith(JUnit3RunnerWithInners.class)
+        public static class ObsoleteLabelSyntax extends AbstractQuickFixTest {
+            public void testAllFilesPresentInObsoleteLabelSyntax() throws Exception {
+                JetTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/quickfix/migration/obsoleteLabelSyntax"), Pattern.compile("^(\\w+)\\.kt$"), true);
+            }
+
+            @TestMetadata("lambda.kt")
+            public void testLambda() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/migration/obsoleteLabelSyntax/lambda.kt");
+                doTest(fileName);
+            }
+
+            @TestMetadata("loop.kt")
+            public void testLoop() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/migration/obsoleteLabelSyntax/loop.kt");
+                doTest(fileName);
+            }
+        }
+
+        @TestMetadata("idea/testData/quickfix/migration/removeNameFromFunctionExpression")
+        @TestDataPath("$PROJECT_ROOT")
+        @RunWith(JUnit3RunnerWithInners.class)
+        public static class RemoveNameFromFunctionExpression extends AbstractQuickFixTest {
+            public void testAllFilesPresentInRemoveNameFromFunctionExpression() throws Exception {
+                JetTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/quickfix/migration/removeNameFromFunctionExpression"), Pattern.compile("^(\\w+)\\.kt$"), true);
+            }
+
+            @TestMetadata("basic.kt")
+            public void testBasic() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/migration/removeNameFromFunctionExpression/basic.kt");
+                doTest(fileName);
+            }
+        }
+
         @TestMetadata("idea/testData/quickfix/migration/replaceJavaClassAsAnnotationParameter")
         @TestDataPath("$PROJECT_ROOT")
         @RunWith(JUnit3RunnerWithInners.class)

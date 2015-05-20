@@ -159,6 +159,8 @@ public interface Errors {
     DiagnosticFactory0<JetNullableType> NULLABLE_SUPERTYPE = DiagnosticFactory0.create(ERROR, NULLABLE_TYPE);
     DiagnosticFactory0<JetTypeReference> DYNAMIC_SUPERTYPE = DiagnosticFactory0.create(ERROR);
 
+    DiagnosticFactory0<JetElement> MISSING_CONSTRUCTOR_KEYWORD = DiagnosticFactory0.create(WARNING);
+
     // Secondary constructors
 
     DiagnosticFactory0<JetConstructorDelegationReferenceExpression> CYCLIC_CONSTRUCTOR_DELEGATION_CALL = DiagnosticFactory0.create(ERROR);
@@ -348,6 +350,7 @@ public interface Errors {
             DiagnosticFactory1.create(ERROR, DECLARATION_SIGNATURE);
 
     DiagnosticFactory0<JetFunction> FUNCTION_DECLARATION_WITH_NO_NAME = DiagnosticFactory0.create(ERROR, DECLARATION_SIGNATURE);
+    DiagnosticFactory0<PsiElement>  FUNCTION_EXPRESSION_WITH_NAME     = DiagnosticFactory0.create(WARNING);
 
     DiagnosticFactory0<JetParameter> VALUE_PARAMETER_WITH_NO_TYPE_ANNOTATION = DiagnosticFactory0.create(ERROR);
 

@@ -1,13 +1,16 @@
 package bar
 
-[file: foo]
+@file:foo
 val prop
 
-[file:bar baz]
+@file:[bar baz]
 fun func() {}
 
-[file:baz]
+@file:[baz]
 class C
 
-[file:]
-interface T
+@file:
+trait T
+
+@file:[]
+trait T

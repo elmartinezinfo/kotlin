@@ -1,17 +1,14 @@
 JetFile: withoutPackageWithSimpleAnnotation.kt
   FILE_ANNOTATION_LIST
-    ANNOTATION
-      PsiElement(LBRACKET)('[')
+    ANNOTATION_ENTRY
+      PsiElement(AT)('@')
       PsiElement(file)('file')
       PsiElement(COLON)(':')
-      PsiWhiteSpace(' ')
-      ANNOTATION_ENTRY
-        CONSTRUCTOR_CALLEE
-          TYPE_REFERENCE
-            USER_TYPE
-              REFERENCE_EXPRESSION
-                PsiElement(IDENTIFIER)('foo')
-      PsiElement(RBRACKET)(']')
+      CONSTRUCTOR_CALLEE
+        TYPE_REFERENCE
+          USER_TYPE
+            REFERENCE_EXPRESSION
+              PsiElement(IDENTIFIER)('foo')
   PsiWhiteSpace('\n')
   PACKAGE_DIRECTIVE
     <empty list>
@@ -31,19 +28,17 @@ JetFile: withoutPackageWithSimpleAnnotation.kt
               REFERENCE_EXPRESSION
                 PsiElement(IDENTIFIER)('bar')
       PsiWhiteSpace('\n')
-      ANNOTATION
-        PsiElement(LBRACKET)('[')
+      ANNOTATION_ENTRY
+        PsiElement(AT)('@')
         PsiErrorElement:File annotations are only allowed before package declaration
           PsiElement(file)('file')
           PsiElement(COLON)(':')
         PsiWhiteSpace(' ')
-        ANNOTATION_ENTRY
-          CONSTRUCTOR_CALLEE
-            TYPE_REFERENCE
-              USER_TYPE
-                REFERENCE_EXPRESSION
-                  PsiElement(IDENTIFIER)('baz')
-        PsiElement(RBRACKET)(']')
+        CONSTRUCTOR_CALLEE
+          TYPE_REFERENCE
+            USER_TYPE
+              REFERENCE_EXPRESSION
+                PsiElement(IDENTIFIER)('baz')
     PsiWhiteSpace('\n')
     PsiElement(fun)('fun')
     PsiWhiteSpace(' ')

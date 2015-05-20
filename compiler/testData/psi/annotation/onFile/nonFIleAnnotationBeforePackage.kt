@@ -1,8 +1,7 @@
-[foo]
-[file bar]
-[file, baz]
-[file]
-[:foo.bar]
-[file:]
-[:]
+@foo
+@file @bar
+@file:
+@:baz
+@fil:ann
+@ :
 package boo

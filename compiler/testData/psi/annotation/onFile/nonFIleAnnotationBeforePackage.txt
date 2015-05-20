@@ -1,85 +1,57 @@
 JetFile: nonFIleAnnotationBeforePackage.kt
   FILE_ANNOTATION_LIST
-    ANNOTATION
-      PsiElement(LBRACKET)('[')
+    ANNOTATION_ENTRY
+      PsiElement(AT)('@')
       PsiErrorElement:Expecting "file:" prefix for file annotations
         <empty list>
-      ANNOTATION_ENTRY
-        CONSTRUCTOR_CALLEE
-          TYPE_REFERENCE
-            USER_TYPE
-              REFERENCE_EXPRESSION
-                PsiElement(IDENTIFIER)('foo')
-      PsiElement(RBRACKET)(']')
+      CONSTRUCTOR_CALLEE
+        TYPE_REFERENCE
+          USER_TYPE
+            REFERENCE_EXPRESSION
+              PsiElement(IDENTIFIER)('foo')
     PsiWhiteSpace('\n')
-    ANNOTATION
-      PsiElement(LBRACKET)('[')
+    ANNOTATION_ENTRY
+      PsiElement(AT)('@')
       PsiElement(file)('file')
-      PsiErrorElement:Expecting "file:" prefix for file annotations
-        <empty list>
       PsiWhiteSpace(' ')
-      ANNOTATION_ENTRY
-        CONSTRUCTOR_CALLEE
-          TYPE_REFERENCE
-            USER_TYPE
-              REFERENCE_EXPRESSION
-                PsiElement(IDENTIFIER)('bar')
-      PsiElement(RBRACKET)(']')
-    PsiWhiteSpace('\n')
-    ANNOTATION
-      PsiElement(LBRACKET)('[')
-      PsiElement(file)('file')
       PsiErrorElement:Expecting "file:" prefix for file annotations
-        PsiElement(COMMA)(',')
+        PsiElement(AT)('@')
+      CONSTRUCTOR_CALLEE
+        TYPE_REFERENCE
+          USER_TYPE
+            REFERENCE_EXPRESSION
+              PsiElement(IDENTIFIER)('bar')
+    PsiWhiteSpace('\n')
+    PsiErrorElement:Expected annotation identifier after '@file:'
+      PsiElement(AT)('@')
+      PsiElement(IDENTIFIER)('file')
+      PsiElement(COLON)(':')
+    PsiWhiteSpace('\n')
+    ANNOTATION_ENTRY
+      PsiElement(AT)('@')
+      PsiErrorElement:Expected 'file' keyword before ':'
+        PsiElement(COLON)(':')
+      CONSTRUCTOR_CALLEE
+        TYPE_REFERENCE
+          USER_TYPE
+            REFERENCE_EXPRESSION
+              PsiElement(IDENTIFIER)('baz')
+    PsiWhiteSpace('\n')
+    ANNOTATION_ENTRY
+      PsiElement(AT)('@')
+      PsiErrorElement:Expected 'file' keyword as target
+        PsiElement(IDENTIFIER)('fil')
+      PsiElement(COLON)(':')
+      CONSTRUCTOR_CALLEE
+        TYPE_REFERENCE
+          USER_TYPE
+            REFERENCE_EXPRESSION
+              PsiElement(IDENTIFIER)('ann')
+    PsiWhiteSpace('\n')
+    PsiErrorElement:Expected annotation identifier after ':'
+      PsiElement(AT)('@')
       PsiWhiteSpace(' ')
-      ANNOTATION_ENTRY
-        CONSTRUCTOR_CALLEE
-          TYPE_REFERENCE
-            USER_TYPE
-              REFERENCE_EXPRESSION
-                PsiElement(IDENTIFIER)('baz')
-      PsiElement(RBRACKET)(']')
-    PsiWhiteSpace('\n')
-    ANNOTATION
-      PsiElement(LBRACKET)('[')
-      PsiElement(file)('file')
-      PsiErrorElement:Expecting "file:" prefix for file annotations
-        <empty list>
-      PsiElement(RBRACKET)(']')
-    PsiWhiteSpace('\n')
-    ANNOTATION
-      PsiElement(LBRACKET)('[')
-      PsiErrorElement:Expecting "file:" prefix for file annotations
-        <empty list>
       PsiElement(COLON)(':')
-      ANNOTATION_ENTRY
-        CONSTRUCTOR_CALLEE
-          TYPE_REFERENCE
-            USER_TYPE
-              USER_TYPE
-                REFERENCE_EXPRESSION
-                  PsiElement(IDENTIFIER)('foo')
-              PsiElement(DOT)('.')
-              REFERENCE_EXPRESSION
-                PsiElement(IDENTIFIER)('bar')
-      PsiElement(RBRACKET)(']')
-    PsiWhiteSpace('\n')
-    ANNOTATION
-      PsiElement(LBRACKET)('[')
-      PsiElement(file)('file')
-      PsiElement(COLON)(':')
-      PsiErrorElement:Expecting a list of annotations
-        <empty list>
-      PsiElement(RBRACKET)(']')
-    PsiWhiteSpace('\n')
-    ANNOTATION
-      PsiElement(LBRACKET)('[')
-      PsiErrorElement:Expecting "file:" prefix for file annotations
-        <empty list>
-      PsiElement(COLON)(':')
-      PsiErrorElement:Expecting a list of annotations
-        <empty list>
-      PsiElement(RBRACKET)(']')
   PsiWhiteSpace('\n')
   PACKAGE_DIRECTIVE
     PsiElement(package)('package')

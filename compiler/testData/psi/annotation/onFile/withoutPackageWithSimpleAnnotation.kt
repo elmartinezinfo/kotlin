@@ -1,4 +1,4 @@
-[file: foo]
+@file:foo
 foo bar
-[file: baz]
+@file: baz
 fun foo() {}

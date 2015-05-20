@@ -1,3 +1,2 @@
-[file: foo bar
-baz]
+@file: [foo bar baz]
 package bar

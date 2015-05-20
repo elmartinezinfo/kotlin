@@ -197,6 +197,7 @@ public class DefaultErrorMessages {
 
         MAP.put(NON_MEMBER_FUNCTION_NO_BODY, "Function ''{0}'' must have a body", NAME);
         MAP.put(FUNCTION_DECLARATION_WITH_NO_NAME, "Function declaration must have a name");
+        MAP.put(FUNCTION_EXPRESSION_WITH_NAME, "Function expressions with names are deprecated");
         MAP.put(NON_FINAL_MEMBER_IN_FINAL_CLASS, "\"open\" has no effect in a final class");
 
         MAP.put(PUBLIC_MEMBER_SHOULD_SPECIFY_TYPE, "Public or protected member should have specified type");
@@ -441,6 +442,8 @@ public class DefaultErrorMessages {
         }, DECLARATION_NAME);
         MAP.put(SMARTCAST_IMPOSSIBLE,
                 "Smart cast to ''{0}'' is impossible, because ''{1}'' could have changed since the is-check", RENDER_TYPE, STRING);
+
+        MAP.put(MISSING_CONSTRUCTOR_KEYWORD, "Use 'constructor' keyword after modifiers of primary constructor");
 
         MAP.put(VARIANCE_ON_TYPE_PARAMETER_OF_FUNCTION_OR_PROPERTY, "Variance annotations are only allowed for type parameters of classes and interfaces");
         MAP.put(TYPE_VARIANCE_CONFLICT, "Type parameter {0} is declared as ''{1}'' but occurs in ''{2}'' position in type {3}",

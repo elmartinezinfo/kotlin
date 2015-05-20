@@ -1,3 +1,3 @@
-[ann] fun foo(): String? = null
+@ann fun foo(): String? = null
 
 annotation class ann

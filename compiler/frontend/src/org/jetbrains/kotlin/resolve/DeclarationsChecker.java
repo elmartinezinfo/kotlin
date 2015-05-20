@@ -234,6 +234,7 @@ public class DeclarationsChecker {
         }
     }
     private void checkObject(JetObjectDeclaration declaration, ClassDescriptor classDescriptor) {
+        AnnotationResolver.reportDeprecatedAnnotationSyntax(declaration.getAnnotations(), trace);
         reportErrorIfHasIllegalModifier(declaration);
         if  (declaration.isLocal() && !declaration.isCompanion() && !declaration.isObjectLiteral()) {
             trace.report(LOCAL_OBJECT_NOT_ALLOWED.on(declaration, classDescriptor));
@@ -280,6 +281,10 @@ public class DeclarationsChecker {
             if (propertyDescriptor != null) {
                 modifiersChecker.checkModifiersForDeclaration(parameter, propertyDescriptor);
             }
+        }
+
+        if (declaration.getModifierList() != null && !declaration.hasConstructorKeyword()) {
+            trace.report(MISSING_CONSTRUCTOR_KEYWORD.on(declaration.getModifierList()));
         }
 
         checkConstructorDeclaration(primaryConstructor, declaration);

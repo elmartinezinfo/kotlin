@@ -1,22 +1,20 @@
 JetFile: manyAnnotationBlocks.kt
   FILE_ANNOTATION_LIST
-    ANNOTATION
-      PsiElement(LBRACKET)('[')
+    ANNOTATION_ENTRY
+      PsiElement(AT)('@')
       PsiElement(file)('file')
       PsiElement(COLON)(':')
-      PsiWhiteSpace(' ')
-      ANNOTATION_ENTRY
-        CONSTRUCTOR_CALLEE
-          TYPE_REFERENCE
-            USER_TYPE
-              REFERENCE_EXPRESSION
-                PsiElement(IDENTIFIER)('foo')
-      PsiElement(RBRACKET)(']')
+      CONSTRUCTOR_CALLEE
+        TYPE_REFERENCE
+          USER_TYPE
+            REFERENCE_EXPRESSION
+              PsiElement(IDENTIFIER)('foo')
     PsiWhiteSpace('\n')
     ANNOTATION
-      PsiElement(LBRACKET)('[')
+      PsiElement(AT)('@')
       PsiElement(file)('file')
       PsiElement(COLON)(':')
+      PsiElement(LBRACKET)('[')
       ANNOTATION_ENTRY
         CONSTRUCTOR_CALLEE
           TYPE_REFERENCE

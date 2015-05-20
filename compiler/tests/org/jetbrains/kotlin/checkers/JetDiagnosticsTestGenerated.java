@@ -4785,6 +4785,12 @@ public class JetDiagnosticsTestGenerated extends AbstractJetDiagnosticsTest {
                 doTest(fileName);
             }
 
+            @TestMetadata("NameDeprecation.kt")
+            public void testNameDeprecation() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/functionAsExpression/NameDeprecation.kt");
+                doTest(fileName);
+            }
+
             @TestMetadata("NoOverloadError.kt")
             public void testNoOverloadError() throws Exception {
                 String fileName = JetTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/functionAsExpression/NoOverloadError.kt");
@@ -7656,6 +7662,12 @@ public class JetDiagnosticsTestGenerated extends AbstractJetDiagnosticsTest {
             @TestMetadata("incompatibleVarianceModifiers.kt")
             public void testIncompatibleVarianceModifiers() throws Exception {
                 String fileName = JetTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/modifiers/incompatibleVarianceModifiers.kt");
+                doTest(fileName);
+            }
+
+            @TestMetadata("primaryConstructorMissingKeyword.kt")
+            public void testPrimaryConstructorMissingKeyword() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/modifiers/primaryConstructorMissingKeyword.kt");
                 doTest(fileName);
             }
 
@@ -10773,6 +10785,12 @@ public class JetDiagnosticsTestGenerated extends AbstractJetDiagnosticsTest {
                 doTest(fileName);
             }
 
+            @TestMetadata("implicitSuperCallErrorsIfPrimary.kt")
+            public void testImplicitSuperCallErrorsIfPrimary() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/secondaryConstructors/implicitSuperCallErrorsIfPrimary.kt");
+                doTest(fileName);
+            }
+
             @TestMetadata("initializationFromOtherInstance.kt")
             public void testInitializationFromOtherInstance() throws Exception {
                 String fileName = JetTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/secondaryConstructors/initializationFromOtherInstance.kt");
@@ -10848,6 +10866,12 @@ public class JetDiagnosticsTestGenerated extends AbstractJetDiagnosticsTest {
             @TestMetadata("redeclarationsOfConstructorsIgnored.kt")
             public void testRedeclarationsOfConstructorsIgnored() throws Exception {
                 String fileName = JetTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/secondaryConstructors/redeclarationsOfConstructorsIgnored.kt");
+                doTest(fileName);
+            }
+
+            @TestMetadata("reportResolutionErrorOnImplicitOnce.kt")
+            public void testReportResolutionErrorOnImplicitOnce() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("compiler/testData/diagnostics/tests/secondaryConstructors/reportResolutionErrorOnImplicitOnce.kt");
                 doTest(fileName);
             }
 

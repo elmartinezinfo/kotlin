@@ -31,8 +31,16 @@ import org.jetbrains.kotlin.idea.JetFileType
 import org.jetbrains.kotlin.utils.LibraryUtils
 import com.intellij.openapi.util.io.FileUtil
 import org.apache.commons.io.FilenameUtils
+import org.gradle.api.file.FileCollection
+import org.gradle.api.plugins.ExtraPropertiesExtension
+import org.gradle.api.tasks.compile.JavaCompile
+import org.jetbrains.org.objectweb.asm.ClassWriter
+import java.io.IOException
+import java.lang.ref.WeakReference
 
 val DEFAULT_ANNOTATIONS = "org.jebrains.kotlin.gradle.defaultAnnotations"
+
+val ANNOTATIONS_PLUGIN_NAME = "org.jetbrains.kotlin.kapt"
 
 abstract class AbstractKotlinCompile<T : CommonCompilerArguments>() : AbstractCompile() {
     abstract protected val compiler: CLICompiler<T>
@@ -101,9 +109,6 @@ public open class KotlinCompile() : AbstractKotlinCompile<K2JVMCompilerArguments
     val srcDirsSources = HashSet<SourceDirectorySet>()
 
     override fun populateTargetSpecificArgs(args: K2JVMCompilerArguments) {
-        val extraProperties = getExtensions().getExtraProperties()
-        args.pluginClasspaths = extraProperties.get("compilerPluginClasspaths") as? Array<String>
-        args.pluginOptions = extraProperties.get("compilerPluginArguments") as? Array<String>
         // show kotlin compiler where to look for java source files
         args.freeArgs = (args.freeArgs + getJavaSourceRoots().map { it.getAbsolutePath() }).toSet().toList()
 
@@ -116,6 +121,20 @@ public open class KotlinCompile() : AbstractKotlinCompile<K2JVMCompilerArguments
         } else {
             kotlinOptions.destination
         }
+
+        val extraProperties = getExtensions().getExtraProperties()
+        args.pluginClasspaths = extraProperties.get("compilerPluginClasspaths") as? Array<String>
+        val basePluginOptions = (extraProperties.get("compilerPluginArguments") as? Array<String>) ?: array()
+
+        val pluginOptions = arrayListOf(*basePluginOptions)
+
+        val kaptAnnotationsFile = extraProperties.getOrNull<File>("kaptAnnotationsFile")
+        if (kaptAnnotationsFile != null) {
+            if (kaptAnnotationsFile.exists()) kaptAnnotationsFile.delete()
+            pluginOptions.add("plugin:$ANNOTATIONS_PLUGIN_NAME:output=" + kaptAnnotationsFile)
+        }
+
+        args.pluginOptions = pluginOptions.toTypedArray()
 
         val embeddedAnnotations = getAnnotations(getProject(), getLogger())
         val userAnnotations = kotlinOptions.annotations?.split(File.pathSeparatorChar)?.toList() ?: emptyList()
@@ -306,6 +325,14 @@ public open class KDoc() : SourceTask() {
             ExitCode.INTERNAL_ERROR -> throw GradleException("Internal generation error. See log for more details")
         }
 
+    }
+}
+
+private inline fun <reified T: Any> ExtraPropertiesExtension.getOrNull(id: String): T? {
+    try {
+        return get(id) as T
+    } catch (e: ExtraPropertiesExtension.UnknownPropertyException) {
+        return null
     }
 }
 

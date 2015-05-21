@@ -38,15 +38,18 @@ import org.gradle.api.file.SourceDirectorySet
 import kotlin.properties.Delegates
 import org.gradle.api.tasks.Delete
 import groovy.lang.Closure
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.FileCollection
 import org.jetbrains.kotlin.gradle.tasks.KotlinTasksProvider
 import java.util.ServiceLoader
 import org.gradle.api.logging.*
+import org.gradle.api.tasks.compile.JavaCompile
+import org.jetbrains.kotlin.gradle.internal.AnnotationProcessingManager
 import java.net.URL
 import java.util.jar.Manifest
+import java.lang.ref.WeakReference
 
 val DEFAULT_ANNOTATIONS = "org.jebrains.kotlin.gradle.defaultAnnotations"
-
 
 abstract class KotlinSourceSetProcessor<T : AbstractCompile>(
         val project: ProjectInternal,
@@ -129,6 +132,10 @@ class Kotlin2JvmSourceSetProcessor(
         compilerClass = tasksProvider.kotlinJVMCompileTaskClass
 ) {
 
+    private companion object {
+        private var cachedKotlinAnnotationProcessingDep: String? = null
+    }
+
     override fun doTargetSpecificProcessing() {
         // store kotlin classes in separate directory. They will serve as class-path to java compiler
         val kotlinDestinationDir = File(project.getBuildDir(), "kotlin-classes/${sourceSetName}")
@@ -137,15 +144,36 @@ class Kotlin2JvmSourceSetProcessor(
         val javaTask = project.getTasks().findByName(sourceSet.getCompileJavaTaskName()) as AbstractCompile?
 
         if (javaTask != null) {
+            kotlinTask.getExtensions().getExtraProperties().set("javaTask", WeakReference(javaTask))
             javaTask.dependsOn(kotlinTaskName)
             val javacClassPath = javaTask.getClasspath() + project.files(kotlinDestinationDir);
             javaTask.setClasspath(javacClassPath)
         }
 
+        val kotlinAnnotationProcessingDep = cachedKotlinAnnotationProcessingDep ?: run {
+            val projectVersion = loadKotlinVersionFromResource(project.getLogger())
+            val dep = "org.jetbrains.kotlin:kotlin-annotation-processing:$projectVersion"
+            cachedKotlinAnnotationProcessingDep = dep
+            dep
+        }
+
+        val aptConfiguration = project.createAptConfiguration(sourceSet.getName(), kotlinAnnotationProcessingDep)
+
         project afterEvaluate { project ->
             if (project != null) {
                 for (dir in sourceSet.getJava().getSrcDirs()) {
                     kotlinDirSet?.srcDir(dir)
+                }
+
+                if (aptConfiguration.getDependencies().size() > 1 && javaTask is JavaCompile) {
+                    val (aptOutputDir, aptWorkingDir) = project.getAptDirsForSourceSet(kotlinTask, sourceSet.getName())
+
+                    val kaptManager = AnnotationProcessingManager(kotlinTask, javaTask, aptConfiguration.resolve(), aptOutputDir, aptWorkingDir)
+                    kotlinTask.storeKaptAnnotationsFile(kaptManager)
+
+                    javaTask.doFirst {
+                        kaptManager.setupKapt()
+                    }
                 }
             }
         }
@@ -277,6 +305,11 @@ open class KotlinAndroidPlugin [Inject] (val scriptHandler: ScriptHandler, val t
             }
         }
 
+        val aptConfigurations = hashMapOf<String, Configuration>()
+
+        val projectVersion = loadKotlinVersionFromResource(log)
+        val kotlinAnnotationProcessingDep = "org.jetbrains.kotlin:kotlin-annotation-processing:$projectVersion"
+
         ext.getSourceSets().all(Action<AndroidSourceSet> { sourceSet ->
             if (sourceSet is HasConvention) {
                 val sourceSetName = sourceSet.getName()
@@ -285,6 +318,8 @@ open class KotlinAndroidPlugin [Inject] (val scriptHandler: ScriptHandler, val t
                 val kotlinDirSet = kotlinSourceSet.getKotlin()
                 kotlinDirSet.srcDir(project.file("src/${sourceSetName}/kotlin"))
 
+                aptConfigurations.put(sourceSet.getName(),
+                        project.createAptConfiguration(sourceSet.getName(), kotlinAnnotationProcessingDep))
 
                 /*TODO: before 0.11 gradle android plugin there was:
                   sourceSet.getAllJava().source(kotlinDirSet)
@@ -305,18 +340,21 @@ open class KotlinAndroidPlugin [Inject] (val scriptHandler: ScriptHandler, val t
                 val plugin = (project.getPlugins().findPlugin("android")
                                 ?: project.getPlugins().findPlugin("android-library")) as BasePlugin
 
-                processVariantData(plugin.getVariantManager().getVariantDataList(), project, ext, plugin)
+                processVariantData(plugin.getVariantManager().getVariantDataList(), project,
+                        ext, plugin, aptConfigurations)
             }
         }
 
-        project.getExtensions().add(DEFAULT_ANNOTATIONS, GradleUtils(scriptHandler, project).resolveKotlinPluginDependency("kotlin-android-sdk-annotations"))
+        project.getExtensions().add(DEFAULT_ANNOTATIONS, GradleUtils(scriptHandler, project)
+                .resolveKotlinPluginDependency("kotlin-android-sdk-annotations"))
     }
 
     private fun processVariantData(
             variantDataList: List<BaseVariantData<out BaseVariantOutputData>>,
             project: Project,
             androidExt: BaseExtension,
-            androidPlugin: BasePlugin
+            androidPlugin: BasePlugin,
+            aptConfigurations: Map<String, Configuration>
     ) {
         val logger = project.getLogger()
         val kotlinOptions = getExtension<Any?>(androidExt, "kotlinOptions")
@@ -362,6 +400,8 @@ open class KotlinAndroidPlugin [Inject] (val scriptHandler: ScriptHandler, val t
 
             configureDefaultSourceSet()
 
+            val aptFiles = arrayListOf<File>()
+
             // getSortedSourceProviders should return only actual java sources, generated sources should be collected earlier
             val providers = variantData.getVariantConfiguration().getSortedSourceProviders()
             for (provider in providers) {
@@ -371,9 +411,18 @@ open class KotlinAndroidPlugin [Inject] (val scriptHandler: ScriptHandler, val t
                 kotlinTask.source(kotlinSourceDirectorySet)
 
                 kotlinSourceDirectorySet.addSourceDirectories(javaSrcDirs)
+
+                val aptConfiguration = aptConfigurations[(provider as AndroidSourceSet).getName()]
+                // Ignore if there's only an annotation processor wrapper in dependencies (added by default)
+                if (aptConfiguration != null && aptConfiguration.getDependencies().size() > 1) {
+                    aptFiles.addAll(aptConfiguration.resolve())
+                }
             }
 
             subpluginEnvironment.addSubpluginArguments(project, kotlinTask)
+
+            val (aptOutputDir, aptWorkingDir) = project.getAptDirsForSourceSet(kotlinTask, variantDataName)
+            variantData.addJavaSourceFoldersToModel(aptOutputDir)
 
             kotlinTask doFirst {
                 val androidRT = project.files(AndroidGradleWrapper.getRuntimeJars(androidPlugin, androidExt))
@@ -383,8 +432,12 @@ open class KotlinAndroidPlugin [Inject] (val scriptHandler: ScriptHandler, val t
 
             javaTask.dependsOn(kotlinTaskName)
 
-            javaTask doFirst  {
+            val kaptManager = AnnotationProcessingManager(kotlinTask, javaTask, aptFiles.toSet(), aptOutputDir, aptWorkingDir)
+            kotlinTask.storeKaptAnnotationsFile(kaptManager)
+
+            javaTask doFirst {
                 javaTask.setClasspath(javaTask.getClasspath() + project.files(kotlinTask.property("kotlinDestinationDir")))
+                kaptManager.setupKapt()
             }
         }
     }
@@ -399,6 +452,8 @@ open class KotlinAndroidPlugin [Inject] (val scriptHandler: ScriptHandler, val t
         val result = (obj as HasConvention).getConvention().getPlugins()[extensionName]
         return result as T
     }
+
+
 }
 
 private fun loadSubplugins(project: Project, logger: Logger): SubpluginEnvironment {
@@ -478,6 +533,29 @@ open class GradleUtils(val scriptHandler: ScriptHandler, val project: ProjectInt
     public fun resolveKotlinPluginDependency(artifact: String): Collection<File> =
             resolveDependencies(kotlinPluginArtifactCoordinates(artifact))
     public fun resolveJsLibrary(): File = resolveDependencies(kotlinJsLibraryCoordinates()).first()
+}
+
+private fun AbstractCompile.storeKaptAnnotationsFile(kapt: AnnotationProcessingManager) {
+    getExtensions().getExtraProperties().set("kaptAnnotationsFile", kapt.getAnnotationFile())
+}
+
+private fun Project.getAptDirsForSourceSet(kotlinTask: AbstractCompile, sourceSetName: String): Pair<File, File> {
+    val aptOutputDir = File(getBuildDir(), "generated/source/kapt")
+    val aptOutputDirForVariant = File(aptOutputDir, sourceSetName)
+
+    val aptWorkingDir = File(getBuildDir(), "tmp/kapt")
+    val aptWorkingDirForVariant = File(aptWorkingDir, sourceSetName)
+
+    return aptOutputDirForVariant to aptWorkingDirForVariant
+}
+
+private fun Project.createAptConfiguration(sourceSetName: String, kotlinAnnotationProcessingDep: String): Configuration {
+    val aptConfigurationName = if (sourceSetName != "main") "kapt${sourceSetName.capitalize()}" else "kapt"
+
+    val aptConfiguration = getConfigurations().create(aptConfigurationName)
+    aptConfiguration.getDependencies().add(getDependencies().create(kotlinAnnotationProcessingDep))
+
+    return aptConfiguration
 }
 
 //copied from BasePlugin.getLocalVersion

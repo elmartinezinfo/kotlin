@@ -16,6 +16,8 @@
 
 package org.jetbrains.kotlin.idea.debugger
 
+import com.intellij.debugger.DebuggerInvocationUtil
+import com.intellij.debugger.DebuggerManagerEx
 import com.intellij.debugger.engine.DebugProcessImpl
 import com.intellij.debugger.engine.SuspendContextImpl
 import com.intellij.debugger.engine.MethodFilter
@@ -33,6 +35,28 @@ import org.jetbrains.kotlin.test.InTextDirectivesUtils.findStringWithPrefixes
 import kotlin.properties.Delegates
 import com.intellij.debugger.engine.evaluation.EvaluationContextImpl
 import com.intellij.debugger.impl.DebuggerContextImpl
+import com.intellij.debugger.ui.breakpoints.BreakpointManager
+import com.intellij.debugger.ui.breakpoints.FieldBreakpoint
+import com.intellij.debugger.ui.breakpoints.JavaFieldBreakpointType
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.util.Computable
+import com.intellij.psi.PsiDocumentManager
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiManager
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.xdebugger.XDebuggerManager
+import com.intellij.xdebugger.XDebuggerUtil
+import com.intellij.xdebugger.breakpoints.*
+import org.jetbrains.java.debugger.breakpoints.properties.JavaFieldBreakpointProperties
+import org.jetbrains.kotlin.idea.debugger.breakpoints.KotlinFieldBreakpoint
+import org.jetbrains.kotlin.idea.debugger.breakpoints.KotlinFieldBreakpointType
+import org.jetbrains.kotlin.idea.util.application.runWriteAction
+import org.jetbrains.kotlin.psi.JetFile
+import org.jetbrains.kotlin.test.InTextDirectivesUtils
+import javax.swing.SwingUtilities
 
 abstract class KotlinDebuggerTestBase : KotlinDebuggerTestCase() {
     private var oldSettings: DebuggerSettings by Delegates.notNull()
@@ -61,6 +85,7 @@ abstract class KotlinDebuggerTestBase : KotlinDebuggerTestCase() {
         debuggerSettings.SKIP_CONSTRUCTORS = fileText.getValueForSetting("SKIP_CONSTRUCTORS", oldSettings.SKIP_CONSTRUCTORS)
         debuggerSettings.SKIP_CLASSLOADERS = fileText.getValueForSetting("SKIP_CLASSLOADERS", oldSettings.SKIP_CLASSLOADERS)
         debuggerSettings.TRACING_FILTERS_ENABLED = fileText.getValueForSetting("TRACING_FILTERS_ENABLED", oldSettings.TRACING_FILTERS_ENABLED)
+        debuggerSettings.SKIP_GETTERS = fileText.getValueForSetting("SKIP_GETTERS", oldSettings.SKIP_GETTERS)
     }
 
     private fun String.getValueForSetting(name: String, defaultValue: Boolean): Boolean {
@@ -84,6 +109,7 @@ abstract class KotlinDebuggerTestBase : KotlinDebuggerTestCase() {
         debuggerSettings.SKIP_CONSTRUCTORS = oldSettings.SKIP_CONSTRUCTORS
         debuggerSettings.SKIP_CLASSLOADERS = oldSettings.SKIP_CLASSLOADERS
         debuggerSettings.TRACING_FILTERS_ENABLED = oldSettings.TRACING_FILTERS_ENABLED
+        debuggerSettings.SKIP_GETTERS = oldSettings.SKIP_GETTERS
     }
 
     protected val dp: DebugProcessImpl
@@ -111,6 +137,10 @@ abstract class KotlinDebuggerTestBase : KotlinDebuggerTestCase() {
 
     protected fun SuspendContextImpl.stepInto(ignoreFilters: Boolean, smartStepFilter: MethodFilter?) {
         dp.getManagerThread()!!.schedule(dp.createStepIntoCommand(this, ignoreFilters, smartStepFilter))
+    }
+
+    protected fun SuspendContextImpl.stepOut() {
+        dp.getManagerThread()!!.schedule(dp.createStepOutCommand(this))
     }
 
     protected fun SuspendContextImpl.printContext() {
@@ -146,6 +176,60 @@ abstract class KotlinDebuggerTestBase : KotlinDebuggerTestCase() {
     protected fun finish() {
         onBreakpoint {
             resume(this)
+        }
+    }
+
+    override fun createBreakpoints(file: PsiFile?) {
+        super.createBreakpoints(file)
+
+        if (file == null) return
+
+        val document = PsiDocumentManager.getInstance(myProject).getDocument(file) ?: return
+        val breakpointManager = XDebuggerManager.getInstance(myProject).getBreakpointManager()
+        val breakpointType = javaClass<KotlinFieldBreakpointType>() as Class<out XBreakpointType<XBreakpoint<XBreakpointProperties<*>>, XBreakpointProperties<*>>>
+        val type = XDebuggerUtil.getInstance().findBreakpointType<XBreakpoint<XBreakpointProperties<*>>>(breakpointType) as KotlinFieldBreakpointType
+        val virtualFile = file.getVirtualFile()
+
+        val runnable = {
+            var offset = -1;
+            while (true) {
+                offset = document.getText().indexOf("FieldWatchpoint!", offset + 1)
+                if (offset == -1) break
+
+                val commentLine = document.getLineNumber(offset)
+
+                val comment = document.getText().substring(document.getLineStartOffset(commentLine), document.getLineEndOffset(commentLine))
+
+                val lineIndex = commentLine + 1
+                val fieldName = comment.substringAfter("//FieldWatchpoint! (").substringBefore(")")
+
+                if (!type.canPutAt(virtualFile, lineIndex, myProject)) continue
+
+                val xBreakpoint = runWriteAction {
+                    breakpointManager.addLineBreakpoint(
+                            type as XLineBreakpointType<XBreakpointProperties<*>>,
+                            virtualFile.getUrl(),
+                            lineIndex,
+                            type.createBreakpointProperties(virtualFile, lineIndex)
+                    )
+                }
+
+                val javaBreakpoint = BreakpointManager.getJavaBreakpoint(xBreakpoint)
+                if (javaBreakpoint is KotlinFieldBreakpoint) {
+                    javaBreakpoint.setFieldName(fieldName)
+                    javaBreakpoint.setWatchAccess(true)
+                    javaBreakpoint.setWatchModification(true)
+                    BreakpointManager.addBreakpoint(javaBreakpoint)
+                    println("KotlinFieldBreakpoint created at ${file.getVirtualFile().getName()}:$lineIndex", ProcessOutputTypes.SYSTEM)
+                }
+            }
+        }
+
+        if (!SwingUtilities.isEventDispatchThread()) {
+            DebuggerInvocationUtil.invokeAndWait(myProject, runnable, ModalityState.defaultModalityState())
+        }
+        else {
+            runnable.invoke()
         }
     }
 }

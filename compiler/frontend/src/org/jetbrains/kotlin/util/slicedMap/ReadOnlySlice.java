@@ -16,8 +16,11 @@
 
 package org.jetbrains.kotlin.util.slicedMap;
 
+import org.jetbrains.annotations.NotNull;
+
 public interface ReadOnlySlice<K, V> {
-    SlicedMapKey<K, V> makeKey(K key);
+    @NotNull
+    KeyWithSlice<K, V, ? extends ReadOnlySlice<K, V>> getKey();
 
     V computeValue(SlicedMap map, K key, V value, boolean valueNotFound);
 

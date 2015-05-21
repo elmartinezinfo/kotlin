@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
-public class BasicWritableSlice<K, V> implements WritableSlice<K, V> {
+public class BasicWritableSlice<K, V> extends AbstractWritableSlice<K, V> {
 
     public static Void initSliceDebugNames(Class<?> declarationOwner) {
         for (Field field : declarationOwner.getFields()) {
@@ -48,13 +48,10 @@ public class BasicWritableSlice<K, V> implements WritableSlice<K, V> {
     }
 
     public BasicWritableSlice(RewritePolicy rewritePolicy, boolean isCollective) {
+        super("<BasicWritableSlice>");
+
         this.rewritePolicy = rewritePolicy;
         this.isCollective = isCollective;
-    }
-
-    @Override
-    public SlicedMapKey<K, V> makeKey(K key) {
-        return new SlicedMapKey<K, V>(this, key);
     }
 
     // True to put, false to skip

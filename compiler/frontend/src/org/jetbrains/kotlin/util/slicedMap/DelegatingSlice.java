@@ -49,8 +49,9 @@ public class DelegatingSlice<K, V> implements WritableSlice<K, V> {
     }
 
     @Override
-    public SlicedMapKey<K, V> makeKey(K key) {
-        return delegate.makeKey(key);
+    @NotNull
+    public KeyWithSlice<K, V, WritableSlice<K, V>> getKey() {
+        return delegate.getKey();
     }
 
     @Override

@@ -18,34 +18,25 @@ package org.jetbrains.kotlin.util.slicedMap;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.UserDataHolder;
+import gnu.trove.THashMap;
+import kotlin.Function3;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
-import java.util.Iterator;
+import java.util.Collections;
 import java.util.Map;
 
 public class SlicedMapImpl implements MutableSlicedMap {
 
     public static SlicedMapImpl create() {
-        return new SlicedMapImpl(Maps.<SlicedMapKey<?, ?>, Object>newLinkedHashMap());
+        return new SlicedMapImpl();
     }
 
-    public static SlicedMapImpl create(Map<SlicedMapKey<?, ?>, Object> map) {
-        return new SlicedMapImpl(map);
-    }
-
-    public static SlicedMapImpl create(MapSupplier mapSupplier) {
-        return new SlicedMapImpl(mapSupplier.<SlicedMapKey<?, ?>, Object>get());
-    }
-    
-    private final Map<SlicedMapKey<?, ?>, Object> map;
-    private final Multimap<WritableSlice<?, ?>, Object> collectiveSliceKeys = ArrayListMultimap.create();
-
-    protected SlicedMapImpl(Map<SlicedMapKey<?, ?>, Object> map) {
-        this.map = map;
-    }
+    private final Map<Object, UserDataHolderImpl> map = new THashMap<Object, UserDataHolderImpl>(0);
+    private Multimap<WritableSlice<?, ?>, Object> collectiveSliceKeys = null;
 
     @Override
     public <K, V> void put(WritableSlice<K, V> slice, K key, V value) {
@@ -53,65 +44,109 @@ public class SlicedMapImpl implements MutableSlicedMap {
             return;
         }
 
-        SlicedMapKey<K, V> slicedMapKey = slice.makeKey(key);
+        UserDataHolderImpl holder = map.get(key);
+        if (holder == null) {
+            holder = new UserDataHolderImpl();
+            map.put(key, holder);
+        }
+
+        Key<V> sliceKey = slice.getKey();
+
         RewritePolicy rewritePolicy = slice.getRewritePolicy();
         if (rewritePolicy.rewriteProcessingNeeded(key)) {
-            if (map.containsKey(slicedMapKey)) {
+            V oldValue = holder.getUserData(sliceKey);
+            if (oldValue != null) {
                 //noinspection unchecked
-                if (!rewritePolicy.processRewrite(slice, key, (V) map.get(slicedMapKey), value)) {
+                if (!rewritePolicy.processRewrite(slice, key, oldValue, value)) {
                     return;
                 }
             }
         }
 
         if (slice.isCollective()) {
+            if (collectiveSliceKeys == null) {
+                collectiveSliceKeys = ArrayListMultimap.create();
+            }
+
             collectiveSliceKeys.put(slice, key);
         }
 
-        map.put(slicedMapKey, value);
+        holder.putUserData(sliceKey, value);
         slice.afterPut(this, key, value);
     }
 
     @Override
     public void clear() {
         map.clear();
+        collectiveSliceKeys = null;
     }
 
     @Override
     public <K, V> V get(ReadOnlySlice<K, V> slice, K key) {
-        SlicedMapKey<K, V> slicedMapKey = slice.makeKey(key);
-        //noinspection unchecked
-        V value = (V) map.get(slicedMapKey);
-        return slice.computeValue(this, key, value, value == null && !map.containsKey(slicedMapKey));
+        UserDataHolderImpl holder = map.get(key);
+
+        V value = holder == null ? null : holder.getUserData(slice.getKey());
+
+        return slice.computeValue(this, key, value, value == null);
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <K, V> Collection<K> getKeys(WritableSlice<K, V> slice) {
         assert slice.isCollective() : "Keys are not collected for slice " + slice;
+
+        if (collectiveSliceKeys == null) return Collections.emptyList();
         return (Collection<K>) collectiveSliceKeys.get(slice);
     }
 
     @Override
     public <K, V> V remove(RemovableSlice<K, V> slice, K key) {
-        //noinspection unchecked
-        return (V) map.remove(slice.makeKey(key));
+        UserDataHolderImpl holder = map.get(key);
+
+        if (holder == null) return null;
+
+        Key<V> sliceKey = slice.getKey();
+        V value = holder.getUserData(sliceKey);
+
+        holder.putUserData(sliceKey, null);
+
+        if (holder.isUserDataEmpty()) {
+            map.remove(key);
+        }
+
+        return value;
     }
 
-    @NotNull
     @Override
-    public Iterator<Map.Entry<SlicedMapKey<?, ?>, ?>> iterator() {
-        //noinspection unchecked
-        return (Iterator) map.entrySet().iterator();
+    public void forEach(@NotNull Function3<WritableSlice, Object, Object, Void> f) {
+        for (Map.Entry<Object, UserDataHolderImpl> entry : map.entrySet()) {
+            Object key = entry.getKey();
+            UserDataHolderImpl holder = entry.getValue();
+
+            if (holder == null) continue;
+
+            for (Key<?> sliceKey : holder.getKeys()) {
+                Object value = holder.getUserData(sliceKey);
+
+                f.invoke(((AbstractWritableSlice) sliceKey).getSlice(), key, value);
+            }
+        }
     }
 
     @NotNull
     @Override
     public <K, V> ImmutableMap<K, V> getSliceContents(@NotNull ReadOnlySlice<K, V> slice) {
         ImmutableMap.Builder<K, V> builder = ImmutableMap.builder();
-        for (Map.Entry<SlicedMapKey<?, ?>, ?> entry : map.entrySet()) {
-            if (entry.getKey().getSlice() == slice) {
-                builder.put((K) entry.getKey().getKey(), (V) entry.getValue());
+
+        for (Map.Entry<Object, UserDataHolderImpl> entry : map.entrySet()) {
+
+            UserDataHolder holder = entry.getValue();
+
+            V value = holder.getUserData(slice.getKey());
+
+            if (value != null) {
+                //noinspection unchecked
+                builder.put((K) entry.getKey(), value);
             }
         }
         return builder.build();

@@ -47,6 +47,12 @@ public class RenameTestGenerated extends AbstractRenameTest {
         doTest(fileName);
     }
 
+    @TestMetadata("automaticRenamerJavaParameter/parameter.test")
+    public void testAutomaticRenamerJavaParameter_Parameter() throws Exception {
+        String fileName = JetTestUtils.navigationMetadata("idea/testData/refactoring/rename/automaticRenamerJavaParameter/parameter.test");
+        doTest(fileName);
+    }
+
     @TestMetadata("automaticRenamerOverloads/package.test")
     public void testAutomaticRenamerOverloads_Package() throws Exception {
         String fileName = JetTestUtils.navigationMetadata("idea/testData/refactoring/rename/automaticRenamerOverloads/package.test");
@@ -71,6 +77,12 @@ public class RenameTestGenerated extends AbstractRenameTest {
         doTest(fileName);
     }
 
+    @TestMetadata("automaticRenamerParameter/parameter.test")
+    public void testAutomaticRenamerParameter_Parameter() throws Exception {
+        String fileName = JetTestUtils.navigationMetadata("idea/testData/refactoring/rename/automaticRenamerParameter/parameter.test");
+        doTest(fileName);
+    }
+
     @TestMetadata("defaultObject/defaultObject.test")
     public void testDefaultObject_DefaultObject() throws Exception {
         String fileName = JetTestUtils.navigationMetadata("idea/testData/refactoring/rename/defaultObject/defaultObject.test");
@@ -80,6 +92,12 @@ public class RenameTestGenerated extends AbstractRenameTest {
     @TestMetadata("defaultObjectWithDefaultName/defaultObject.test")
     public void testDefaultObjectWithDefaultName_DefaultObject() throws Exception {
         String fileName = JetTestUtils.navigationMetadata("idea/testData/refactoring/rename/defaultObjectWithDefaultName/defaultObject.test");
+        doTest(fileName);
+    }
+
+    @TestMetadata("renameArgumentsWhenParameterRenamed/parameter.test")
+    public void testRenameArgumentsWhenParameterRenamed_Parameter() throws Exception {
+        String fileName = JetTestUtils.navigationMetadata("idea/testData/refactoring/rename/renameArgumentsWhenParameterRenamed/parameter.test");
         doTest(fileName);
     }
 

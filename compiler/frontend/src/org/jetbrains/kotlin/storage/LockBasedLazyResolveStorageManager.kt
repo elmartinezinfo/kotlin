@@ -52,7 +52,7 @@ public class LockBasedLazyResolveStorageManager(private val storageManager: Stor
         override fun <K, V> getSliceContents(slice: ReadOnlySlice<K, V>) = storageManager.compute { context.getSliceContents<K, V>(slice) }
     }
 
-    private class LockProtectedTrace(private val storageManager: StorageManager, private val trace: BindingTrace) : BindingTrace {
+    public class LockProtectedTrace(private val storageManager: StorageManager, val trace: BindingTrace) : BindingTrace {
         override fun recordType(expression: JetExpression, type: JetType?) {
             storageManager.compute { trace.recordType(expression, type) }
         }

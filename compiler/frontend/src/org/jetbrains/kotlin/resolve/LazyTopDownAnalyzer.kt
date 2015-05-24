@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.resolve.lazy.*
 import org.jetbrains.kotlin.resolve.lazy.descriptors.LazyClassDescriptor
 import org.jetbrains.kotlin.resolve.resolveUtil.checkTraitRequirements
 import org.jetbrains.kotlin.resolve.varianceChecker.VarianceChecker
+import org.jetbrains.kotlin.storage.LockBasedLazyResolveStorageManager
 import org.jetbrains.kotlin.utils.Profiler
 import java.util.ArrayList
 import javax.inject.Inject
@@ -114,8 +115,6 @@ public class LazyTopDownAnalyzer {
 
         // fill in the context
         for (declaration in declarations) {
-            val imports = ArrayList<JetImportDirective>()
-
             declaration.accept(object : JetVisitorVoid() {
                 private fun registerDeclarations(declarations: List<JetDeclaration>) {
                     for (jetDeclaration in declarations) {
@@ -151,10 +150,6 @@ public class LazyTopDownAnalyzer {
 
                 override fun visitPackageDirective(directive: JetPackageDirective) {
                     DescriptorResolver.resolvePackageHeader(directive, moduleDescriptor!!, trace!!)
-                }
-
-                override fun visitImportDirective(importDirective: JetImportDirective) {
-                    imports.add(importDirective)
                 }
 
                 private fun visitClassOrObject(classOrObject: JetClassOrObject) {
@@ -237,22 +232,8 @@ public class LazyTopDownAnalyzer {
                     properties.add(property)
                 }
             })
-
-            if (!imports.isEmpty()) {
-                val profiler = Profiler.create("Resolve imports in ${imports.first().getContainingFile().getName()}")
-                profiler.start()
-
-                imports.forEach {
-                    val fileScope = fileScopeProvider!!.getFileScope(it.getContainingJetFile()) as LazyFileScope
-                    fileScope.forceResolveImport(it)
-                }
-
-                profiler.end()
-            }
         }
 
-        val profiler = Profiler.create("Resolve common")
-        profiler.start()
         createFunctionDescriptors(c, functions)
 
         createPropertyDescriptors(c, topLevelFqNames, properties)
@@ -272,21 +253,21 @@ public class LazyTopDownAnalyzer {
 
         overloadResolver!!.process(c)
 
-        profiler.end()
-
-        val bprofiler = Profiler.create("Body resolve")
-        bprofiler.start()
         bodyResolver!!.resolveBodies(c) {
-//            bodyResolver!!.resolveFunctionBodies(c)
             for ((declaration, descriptor) in c.getFunctions().entrySet()) {
-                val bindingTrace = (topLevelDescriptorProvider as KotlinCodeAnalyzer).resolveFunction(declaration)
-                (bindingTrace as DelegatingBindingTrace).addAllMyDataTo(trace!!)
+                if (!topDownAnalysisMode.isLocalDeclarations && topLevelDescriptorProvider is BodyResolveTaskManager) {
+                    val bindingTrace = (topLevelDescriptorProvider as BodyResolveTaskManager).resolveFunctionBody(declaration)
+                    ((bindingTrace as LockBasedLazyResolveStorageManager.LockProtectedTrace).trace as DelegatingBindingTrace).addAllMyDataTo(trace!!)
 
-                assert(descriptor.getReturnType() != null)
+                    assert(descriptor.getReturnType() != null)
+                }
+                else {
+                    bodyResolver!!.resolveFunctionBody(c, declaration, descriptor)
+                }
             }
         }
 
-        bprofiler.end()
+        // profiler.end()
 
         return c
     }

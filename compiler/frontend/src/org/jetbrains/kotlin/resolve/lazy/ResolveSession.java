@@ -74,7 +74,6 @@ public class ResolveSession implements KotlinCodeAnalyzer, LazyClassContext {
     private QualifiedExpressionResolver qualifiedExpressionResolver;
     private ScriptBodyResolver scriptBodyResolver;
     private LazyDeclarationResolver lazyDeclarationResolver;
-    private BodyResolveTaskManager bodyResolveTaskManager;
 
     @Inject
     public void setJetImportFactory(JetImportsFactory jetImportFactory) {
@@ -119,11 +118,6 @@ public class ResolveSession implements KotlinCodeAnalyzer, LazyClassContext {
     @Inject
     public void setLazyDeclarationResolver(LazyDeclarationResolver lazyDeclarationResolver) {
         this.lazyDeclarationResolver = lazyDeclarationResolver;
-    }
-
-    @Inject
-    public void setBodyResolveTaskManager(BodyResolveTaskManager bodyResolveTaskManager) {
-        this.bodyResolveTaskManager = bodyResolveTaskManager;
     }
 
     // Only calls from injectors expected
@@ -317,12 +311,6 @@ public class ResolveSession implements KotlinCodeAnalyzer, LazyClassContext {
     @NotNull
     public DeclarationDescriptor resolveToDescriptor(@NotNull JetDeclaration declaration) {
         return lazyDeclarationResolver.resolveToDescriptor(declaration);
-    }
-
-    @Override
-    @NotNull
-    public BindingTrace resolveFunction(@NotNull JetNamedFunction function) {
-        return bodyResolveTaskManager.resolveBody(function);
     }
 
     @NotNull

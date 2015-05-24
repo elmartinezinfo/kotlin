@@ -104,6 +104,25 @@ private class KotlinResolveCache(
 
 private class PerFileAnalysisCache(val file: JetFile, val resolveSession: ResolveSessionForBodies) {
     private val cache = HashMap<PsiElement, AnalysisResult>()
+    private val lazyTopDownAnalyzer : LazyTopDownAnalyzerForTopLevel
+    private val trace: BindingTrace
+
+    init {
+        trace = DelegatingBindingTrace(resolveSession.getBindingContext(), "Trace for resolution file " + file)
+
+        val targetPlatform = TargetPlatformDetector.getPlatform(file)
+        val globalContext = SimpleGlobalContext(resolveSession.getStorageManager(), resolveSession.getExceptionTracker())
+        val moduleContext = globalContext.withProject(file.getProject()).withModule(resolveSession.getModuleDescriptor())
+
+        lazyTopDownAnalyzer = InjectorForLazyBodyResolve(
+                moduleContext,
+                resolveSession,
+                resolveSession.getScopeProvider(),
+                trace,
+                targetPlatform.getAdditionalCheckerProvider(),
+                targetPlatform.getDynamicTypesSettings()
+        ).getLazyTopDownAnalyzerForTopLevel()!!
+    }
 
     private fun lookUp(analyzableElement: JetElement): AnalysisResult? {
         // Looking for parent elements that are already analyzed
@@ -155,7 +174,7 @@ private class PerFileAnalysisCache(val file: JetFile, val resolveSession: Resolv
         }
 
         try {
-            return KotlinResolveDataProvider.analyze(project, resolveSession, analyzableElement)
+            return KotlinResolveDataProvider.analyze(trace.getBindingContext(), lazyTopDownAnalyzer, resolveSession, analyzableElement)
         }
         catch (e: ProcessCanceledException) {
             throw e
@@ -207,7 +226,8 @@ private object KotlinResolveDataProvider {
                     ?: element.getContainingJetFile()
     }
 
-    fun analyze(project: Project, resolveSession: ResolveSessionForBodies, analyzableElement: JetElement): AnalysisResult {
+    fun analyze(context: BindingContext, analyzer: LazyTopDownAnalyzerForTopLevel,
+                resolveSession: ResolveSessionForBodies, analyzableElement: JetElement): AnalysisResult {
         try {
             if (analyzableElement is JetCodeFragment) {
                 return AnalysisResult.success(
@@ -222,28 +242,9 @@ private object KotlinResolveDataProvider {
                 file.putUserData(LibrarySourceHacks.SKIP_TOP_LEVEL_MEMBERS, true)
             }
 
-            val trace = DelegatingBindingTrace(resolveSession.getBindingContext(), "Trace for resolution of " + analyzableElement)
+            analyzer.analyzeDeclarations(TopDownAnalysisMode.TopLevelDeclarations, listOf(analyzableElement))
 
-            val targetPlatform = TargetPlatformDetector.getPlatform(analyzableElement.getContainingJetFile())
-            val globalContext = SimpleGlobalContext(resolveSession.getStorageManager(), resolveSession.getExceptionTracker())
-            val moduleContext = globalContext.withProject(project).withModule(resolveSession.getModuleDescriptor())
-            val lazyTopDownAnalyzer = InjectorForLazyBodyResolve(
-                    moduleContext,
-                    resolveSession,
-                    resolveSession.getScopeProvider(),
-                    trace,
-                    targetPlatform.getAdditionalCheckerProvider(),
-                    targetPlatform.getDynamicTypesSettings()
-            ).getLazyTopDownAnalyzerForTopLevel()!!
-
-            lazyTopDownAnalyzer.analyzeDeclarations(
-                    TopDownAnalysisMode.TopLevelDeclarations,
-                    listOf(analyzableElement)
-            )
-            return AnalysisResult.success(
-                    trace.getBindingContext(),
-                    resolveSession.getModuleDescriptor()
-            )
+            return AnalysisResult.success(context, resolveSession.getModuleDescriptor())
         }
         catch (e: ProcessCanceledException) {
             throw e

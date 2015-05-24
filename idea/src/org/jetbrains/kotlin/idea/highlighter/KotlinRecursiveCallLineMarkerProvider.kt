@@ -53,10 +53,7 @@ public class KotlinRecursiveCallLineMarkerProvider() : LineMarkerProvider {
     override fun collectSlowLineMarkers(elements: MutableList<PsiElement>, result: MutableCollection<LineMarkerInfo<*>>) {
         val markedLineNumbers = HashSet<Int>()
 
-        val profiler = Profiler.create("Recursive calls")
-        profiler.start()
-
-        profiler.printEntering()
+        // val profiler = Profiler.create("Recursive calls").start().printThreadName()
 
         for (element in elements) {
             ProgressManager.checkCanceled()
@@ -69,7 +66,7 @@ public class KotlinRecursiveCallLineMarkerProvider() : LineMarkerProvider {
             }
         }
 
-        profiler.end()
+        // profiler.end()
     }
 
     private fun getEnclosingFunction(element: JetElement, stopOnNonInlinedLambdas: Boolean): JetNamedFunction? {
@@ -120,8 +117,8 @@ public class KotlinRecursiveCallLineMarkerProvider() : LineMarkerProvider {
     }
 
     private fun isRecursiveCall(element: JetElement): Boolean {
-        val elementParent = element.getParent()
         val resolveName = if (element !is JetArrayAccessExpression) {
+            val elementParent = element.getParent()
             when (elementParent) {
                 is JetCallExpression, is JetBinaryExpression,
                 is JetPostfixExpression, is JetPrefixExpression -> {

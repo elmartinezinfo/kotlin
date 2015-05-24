@@ -19,6 +19,7 @@ package org.jetbrains.kotlin.resolve.lazy
 import com.google.common.base.Function
 import com.google.common.base.Functions
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiManager
 import org.jetbrains.kotlin.analyzer.computeTypeInContext
 import org.jetbrains.kotlin.cfg.JetFlowInformationProvider
 import org.jetbrains.kotlin.context.SimpleGlobalContext
@@ -41,11 +42,12 @@ import org.jetbrains.kotlin.resolve.lazy.descriptors.LazyPackageDescriptor
 import org.jetbrains.kotlin.resolve.scopes.ChainedScope
 import org.jetbrains.kotlin.resolve.scopes.JetScope
 import org.jetbrains.kotlin.types.TypeUtils
+import org.jetbrains.kotlin.utils.Profiler
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 
 public abstract class ElementResolver protected(public val resolveSession: ResolveSession) {
 
-    public open fun getElementAdditionalResolve(jetElement: JetElement): BindingContext {
+    public open fun getElementAdditionalResolve(jetElement: JetElement): BindingTrace {
         return performElementAdditionalResolve(jetElement, jetElement, BodyResolveMode.FULL)
     }
 
@@ -55,6 +57,10 @@ public abstract class ElementResolver protected(public val resolveSession: Resol
             = throw UnsupportedOperationException("Cannot use partial body resolve with no Nothing-functions index");
 
     public fun resolveToElement(jetElement: JetElement, bodyResolveMode: BodyResolveMode = BodyResolveMode.FULL): BindingContext {
+        return resolveToElementWithTrace(jetElement, bodyResolveMode).getBindingContext()
+    }
+
+    public fun resolveToElementWithTrace(jetElement: JetElement, bodyResolveMode: BodyResolveMode = BodyResolveMode.FULL): BindingTrace {
         var jetElement = jetElement
 
         val elementOfAdditionalResolve = findElementOfAdditionalResolve(jetElement)
@@ -83,7 +89,7 @@ public abstract class ElementResolver protected(public val resolveSession: Resol
             resolveSession.resolveToDescriptor(declaration)
         }
 
-        return resolveSession.getBindingContext()
+        return resolveSession.getTrace()
     }
 
     private fun findElementOfAdditionalResolve(element: JetElement): JetElement? {
@@ -110,7 +116,7 @@ public abstract class ElementResolver protected(public val resolveSession: Resol
         return elementOfAdditionalResolve
     }
 
-    protected fun performElementAdditionalResolve(resolveElement: JetElement, contextElement: JetElement, bodyResolveMode: BodyResolveMode): BindingContext {
+    protected fun performElementAdditionalResolve(resolveElement: JetElement, contextElement: JetElement, bodyResolveMode: BodyResolveMode): BindingTrace {
         val file = resolveElement.getContainingJetFile()
 
         val statementFilter = if (bodyResolveMode != BodyResolveMode.FULL && resolveElement is JetDeclaration)
@@ -118,14 +124,8 @@ public abstract class ElementResolver protected(public val resolveSession: Resol
         else
             StatementFilter.NONE
 
-        val trace : BindingTrace = when (resolveElement) {
-            is JetNamedFunction ->
-                if (bodyResolveMode == BodyResolveMode.FULL) {
-                    resolveSession.resolveFunction(resolveElement)
-                }
-                else {
-                    functionAdditionalResolve(resolveSession, resolveElement, file, statementFilter)
-                }
+        val trace: BindingTrace = when (resolveElement) {
+            is JetNamedFunction -> functionAdditionalResolve(resolveSession, resolveElement, file, statementFilter)
 
             is JetClassInitializer -> initializerAdditionalResolve(resolveSession, resolveElement, file, statementFilter)
 
@@ -165,7 +165,7 @@ public abstract class ElementResolver protected(public val resolveSession: Resol
 
         JetFlowInformationProvider(resolveElement, trace).checkDeclaration()
 
-        return trace.getBindingContext()
+        return trace
     }
 
     private fun packageRefAdditionalResolve(resolveSession: ResolveSession, jetElement: JetElement): BindingTrace {
@@ -354,6 +354,11 @@ public abstract class ElementResolver protected(public val resolveSession: Resol
     }
 
     private fun functionAdditionalResolve(resolveSession: ResolveSession, namedFunction: JetNamedFunction, file: JetFile, statementFilter: StatementFilter): BindingTrace {
+//        val profiler = Profiler.create("${if (StatementFilter.NONE != statementFilter) "-------- Partial --------" else ""} ${Thread.currentThread().getName()} " +
+//                                       "Addition: ${namedFunction.getName()} ${namedFunction.hashCode()} $this " +
+//                                       "${PsiManager.getInstance(namedFunction.getProject()).getModificationTracker().getModificationCount()}")
+//        profiler.start()
+
         val trace = createDelegationTrace(namedFunction)
 
         val scope = resolveSession.getScopeProvider().getResolutionScopeForDeclaration(namedFunction)
@@ -362,6 +367,8 @@ public abstract class ElementResolver protected(public val resolveSession: Resol
 
         val bodyResolver = createBodyResolver(resolveSession, trace, file, statementFilter)
         bodyResolver.resolveFunctionBody(DataFlowInfo.EMPTY, trace, namedFunction, functionDescriptor, scope)
+
+//        profiler.end()
 
         return trace
     }
@@ -434,8 +441,7 @@ public abstract class ElementResolver protected(public val resolveSession: Resol
     }
 
     private fun getExpressionMemberScope(resolveSession: ResolveSession, expression: JetExpression): JetScope? {
-        val trace = resolveSession.getStorageManager().createSafeTrace(
-                DelegatingBindingTrace(resolveSession.getBindingContext(), "trace to resolve a member scope of expression", expression))
+        val trace = createDelegationTrace(expression)
 
         if (BindingContextUtils.isExpressionWithValidReference(expression, resolveSession.getBindingContext())) {
             val qualifiedExpressionResolver = resolveSession.getQualifiedExpressionResolver()

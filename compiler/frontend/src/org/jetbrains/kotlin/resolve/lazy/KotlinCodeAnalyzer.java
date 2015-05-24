@@ -46,9 +46,6 @@ public interface KotlinCodeAnalyzer extends TopLevelDescriptorProvider {
     DeclarationDescriptor resolveToDescriptor(@NotNull JetDeclaration declaration);
 
     @NotNull
-    BindingTrace resolveFunction(@NotNull JetNamedFunction function);
-
-    @NotNull
     ScopeProvider getScopeProvider();
 
     /**

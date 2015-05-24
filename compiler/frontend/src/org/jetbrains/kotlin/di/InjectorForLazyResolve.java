@@ -53,16 +53,10 @@ import org.jetbrains.kotlin.resolve.StatementFilter;
 import org.jetbrains.kotlin.resolve.calls.CallCompleter;
 import org.jetbrains.kotlin.resolve.calls.CandidateResolver;
 import org.jetbrains.kotlin.resolve.calls.tasks.TaskPrioritizer;
-import org.jetbrains.kotlin.resolve.BodyResolveTaskManager;
-import org.jetbrains.kotlin.resolve.BodyResolver;
-import org.jetbrains.kotlin.resolve.ControlFlowAnalyzer;
-import org.jetbrains.kotlin.resolve.DeclarationsChecker;
-import org.jetbrains.kotlin.resolve.ModifiersChecker;
-import org.jetbrains.kotlin.resolve.FunctionAnalyzerExtension;
-import org.jetbrains.kotlin.resolve.ScriptBodyResolver;
+import org.jetbrains.kotlin.psi.JetImportsFactory;
 import org.jetbrains.kotlin.resolve.lazy.LazyDeclarationResolver;
 import org.jetbrains.kotlin.resolve.lazy.DeclarationScopeProviderImpl;
-import org.jetbrains.kotlin.psi.JetImportsFactory;
+import org.jetbrains.kotlin.resolve.ScriptBodyResolver;
 import org.jetbrains.kotlin.resolve.lazy.ScopeProvider.AdditionalFileScopeProvider;
 import org.jetbrains.annotations.NotNull;
 import javax.annotation.PreDestroy;
@@ -108,16 +102,10 @@ public class InjectorForLazyResolve {
     private final CallCompleter callCompleter;
     private final CandidateResolver candidateResolver;
     private final TaskPrioritizer taskPrioritizer;
-    private final BodyResolveTaskManager bodyResolveTaskManager;
-    private final BodyResolver bodyResolver;
-    private final ControlFlowAnalyzer controlFlowAnalyzer;
-    private final DeclarationsChecker declarationsChecker;
-    private final ModifiersChecker modifiersChecker;
-    private final FunctionAnalyzerExtension functionAnalyzerExtension;
-    private final ScriptBodyResolver scriptBodyResolver;
+    private final JetImportsFactory jetImportsFactory;
     private final LazyDeclarationResolver lazyDeclarationResolver;
     private final DeclarationScopeProviderImpl declarationScopeProvider;
-    private final JetImportsFactory jetImportsFactory;
+    private final ScriptBodyResolver scriptBodyResolver;
     private final AdditionalFileScopeProvider additionalFileScopeProvider;
 
     public InjectorForLazyResolve(
@@ -164,20 +152,13 @@ public class InjectorForLazyResolve {
         this.candidateResolver = new CandidateResolver();
         this.callCompleter = new CallCompleter(argumentTypeResolver, candidateResolver);
         this.taskPrioritizer = new TaskPrioritizer(storageManager);
-        this.bodyResolveTaskManager = new BodyResolveTaskManager();
-        this.bodyResolver = new BodyResolver();
-        this.controlFlowAnalyzer = new ControlFlowAnalyzer();
-        this.declarationsChecker = new DeclarationsChecker();
-        this.modifiersChecker = new ModifiersChecker(bindingTrace, additionalCheckerProvider);
-        this.functionAnalyzerExtension = new FunctionAnalyzerExtension();
-        this.scriptBodyResolver = new ScriptBodyResolver();
+        this.jetImportsFactory = new JetImportsFactory();
         this.lazyDeclarationResolver = new LazyDeclarationResolver(moduleContext, bindingTrace);
         this.declarationScopeProvider = new DeclarationScopeProviderImpl(lazyDeclarationResolver);
-        this.jetImportsFactory = new JetImportsFactory();
+        this.scriptBodyResolver = new ScriptBodyResolver();
         this.additionalFileScopeProvider = new AdditionalFileScopeProvider();
 
         this.resolveSession.setAnnotationResolve(annotationResolver);
-        this.resolveSession.setBodyResolveTaskManager(bodyResolveTaskManager);
         this.resolveSession.setDescriptorResolver(descriptorResolver);
         this.resolveSession.setFunctionDescriptorResolver(functionDescriptorResolver);
         this.resolveSession.setJetImportFactory(jetImportsFactory);
@@ -250,43 +231,15 @@ public class InjectorForLazyResolve {
 
         candidateResolver.setArgumentTypeResolver(argumentTypeResolver);
 
-        bodyResolveTaskManager.setBodyResolver(bodyResolver);
-        bodyResolveTaskManager.setDeclarationScopeProvider(scopeProvider);
-        bodyResolveTaskManager.setLazyDeclarationResolver(lazyDeclarationResolver);
-        bodyResolveTaskManager.setStorageManager(storageManager);
-        bodyResolveTaskManager.setTrace(bindingTrace);
-
-        bodyResolver.setAdditionalCheckerProvider(additionalCheckerProvider);
-        bodyResolver.setAnnotationResolver(annotationResolver);
-        bodyResolver.setCallResolver(callResolver);
-        bodyResolver.setControlFlowAnalyzer(controlFlowAnalyzer);
-        bodyResolver.setDeclarationsChecker(declarationsChecker);
-        bodyResolver.setDelegatedPropertyResolver(delegatedPropertyResolver);
-        bodyResolver.setExpressionTypingServices(expressionTypingServices);
-        bodyResolver.setFunctionAnalyzerExtension(functionAnalyzerExtension);
-        bodyResolver.setScriptBodyResolverResolver(scriptBodyResolver);
-        bodyResolver.setTrace(bindingTrace);
-        bodyResolver.setValueParameterResolver(valueParameterResolver);
-
-        controlFlowAnalyzer.setTrace(bindingTrace);
-
-        declarationsChecker.setDescriptorResolver(descriptorResolver);
-        declarationsChecker.setModifiersChecker(modifiersChecker);
-        declarationsChecker.setTrace(bindingTrace);
-
-        functionAnalyzerExtension.setTrace(bindingTrace);
-
-        scriptBodyResolver.setAdditionalCheckerProvider(additionalCheckerProvider);
-        scriptBodyResolver.setExpressionTypingServices(expressionTypingServices);
+        jetImportsFactory.setProject(project);
 
         lazyDeclarationResolver.setDeclarationScopeProvider(declarationScopeProvider);
         lazyDeclarationResolver.setTopLevelDescriptorProvider(resolveSession);
 
         declarationScopeProvider.setFileScopeProvider(scopeProvider);
 
-        jetImportsFactory.setProject(project);
-
-        bodyResolveTaskManager.init();
+        scriptBodyResolver.setAdditionalCheckerProvider(additionalCheckerProvider);
+        scriptBodyResolver.setExpressionTypingServices(expressionTypingServices);
 
     }
 

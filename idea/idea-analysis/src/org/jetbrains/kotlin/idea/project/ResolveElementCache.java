@@ -28,8 +28,10 @@ import org.jetbrains.kotlin.idea.stubindex.JetProbablyNothingFunctionShortNameIn
 import org.jetbrains.kotlin.idea.stubindex.JetProbablyNothingPropertyShortNameIndex;
 import org.jetbrains.kotlin.psi.JetElement;
 import org.jetbrains.kotlin.psi.JetFile;
+import org.jetbrains.kotlin.psi.JetNamedFunction;
 import org.jetbrains.kotlin.resolve.AdditionalCheckerProvider;
 import org.jetbrains.kotlin.resolve.BindingContext;
+import org.jetbrains.kotlin.resolve.BindingTrace;
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode;
 import org.jetbrains.kotlin.resolve.lazy.ElementResolver;
 import org.jetbrains.kotlin.resolve.lazy.ProbablyNothingCallableNames;
@@ -41,7 +43,7 @@ import java.util.Collection;
 
 public class ResolveElementCache extends ElementResolver {
     private final Project project;
-    private final CachedValue<MemoizedFunctionToNotNull<JetElement, BindingContext>> additionalResolveCache;
+    private final CachedValue<MemoizedFunctionToNotNull<JetElement, BindingTrace>> additionalResolveCache;
 
     public ResolveElementCache(ResolveSession resolveSession, Project project) {
         super(resolveSession);
@@ -49,16 +51,16 @@ public class ResolveElementCache extends ElementResolver {
 
         // Recreate internal cache after change of modification count
         this.additionalResolveCache =
-                CachedValuesManager.getManager(project).createCachedValue(new CachedValueProvider<MemoizedFunctionToNotNull<JetElement, BindingContext>>() {
+                CachedValuesManager.getManager(project).createCachedValue(new CachedValueProvider<MemoizedFunctionToNotNull<JetElement, BindingTrace>>() {
                             @Nullable
                             @Override
-                            public Result<MemoizedFunctionToNotNull<JetElement, BindingContext>> compute() {
+                            public Result<MemoizedFunctionToNotNull<JetElement, BindingTrace>> compute() {
                                 ResolveSession resolveSession = ResolveElementCache.this.getResolveSession();
                                 LazyResolveStorageManager manager = resolveSession.getStorageManager();
-                                MemoizedFunctionToNotNull<JetElement, BindingContext> elementsCacheFunction =
-                                        manager.createSoftlyRetainedMemoizedFunction(new Function1<JetElement, BindingContext>() {
+                                MemoizedFunctionToNotNull<JetElement, BindingTrace> elementsCacheFunction =
+                                        manager.createMemoizedFunction(new Function1<JetElement, BindingTrace>() {
                                             @Override
-                                            public BindingContext invoke(JetElement jetElement) {
+                                            public BindingTrace invoke(JetElement jetElement) {
                                                 return performElementAdditionalResolve(jetElement, jetElement, BodyResolveMode.FULL);
                                             }
                                         });
@@ -73,7 +75,7 @@ public class ResolveElementCache extends ElementResolver {
 
     @NotNull
     @Override
-    public BindingContext getElementAdditionalResolve(@NotNull JetElement jetElement) {
+    public BindingTrace getElementAdditionalResolve(@NotNull JetElement jetElement) {
         return additionalResolveCache.getValue().invoke(jetElement);
     }
 

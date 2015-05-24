@@ -67,10 +67,9 @@ public open class JetPsiChecker : Annotator, HighlightRangeExtension {
         }
 
         val bindingContext = analysisResult.bindingContext
+        annotateElement(element, holder, bindingContext.getDiagnostics())
 
         getAfterAnalysisVisitor(holder, bindingContext).forEach { visitor -> element.accept(visitor) }
-
-        annotateElement(element, holder, bindingContext.getDiagnostics())
     }
 
     override fun isForceHighlightParents(file: PsiFile): Boolean {

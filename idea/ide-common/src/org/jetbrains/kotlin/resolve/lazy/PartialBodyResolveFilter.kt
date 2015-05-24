@@ -38,7 +38,7 @@ class PartialBodyResolveFilter(
         private val declaration: JetDeclaration,
         probablyNothingCallableNames: ProbablyNothingCallableNames,
         forCompletion: Boolean
-) : StatementFilter() {
+) : StatementFilter("PartialBodyResolveFilter: $elementToResolve") {
 
     private val statementMarks = StatementMarks()
 

@@ -22,35 +22,12 @@ import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfo
 import org.jetbrains.kotlin.resolve.lazy.DeclarationScopeProvider
 import org.jetbrains.kotlin.resolve.lazy.ForceResolveUtil
 import org.jetbrains.kotlin.resolve.lazy.LazyDeclarationResolver
+import org.jetbrains.kotlin.resolve.lazy.ResolveSession
 import org.jetbrains.kotlin.storage.MemoizedFunctionToNotNull
 import org.jetbrains.kotlin.storage.StorageManager
 import javax.annotation.PostConstruct
 import javax.inject.Inject
 
-class BodyResolveTaskManager {
-    public var declarationScopeProvider: DeclarationScopeProvider? = null @Inject set
-    public var lazyDeclarationResolver: LazyDeclarationResolver? = null @Inject set
-    public var bodyResolver: BodyResolver? = null @Inject set
-    public var storageManager: StorageManager? = null @Inject set
-    public var trace: BindingTrace? = null @Inject set
-
-    private var resolveBodyCache: MemoizedFunctionToNotNull<JetNamedFunction, BindingTrace>? = null
-
-    @PostConstruct
-    public fun init() {
-        resolveBodyCache = storageManager!!.createMemoizedFunction { namedFunction: JetNamedFunction ->
-            val safeTrace = DelegatingBindingTrace(trace!!.getBindingContext(), "trace to resolve a member scope of expression", namedFunction)
-
-            val scope = declarationScopeProvider!!.getResolutionScopeForDeclaration(namedFunction)
-            val functionDescriptor = lazyDeclarationResolver!!.resolveToDescriptor(namedFunction) as FunctionDescriptor
-            ForceResolveUtil.forceResolveAllContents(functionDescriptor)
-
-            bodyResolver!!.resolveFunctionBody(DataFlowInfo.EMPTY, safeTrace, namedFunction, functionDescriptor, scope)
-
-            safeTrace
-        }
-    }
-
-    public fun resolveBody(namedFunction: JetNamedFunction): BindingTrace =
-             resolveBodyCache!!.invoke(namedFunction)
+public interface BodyResolveTaskManager {
+    public fun resolveFunctionBody(namedFunction: JetNamedFunction): BindingTrace
 }

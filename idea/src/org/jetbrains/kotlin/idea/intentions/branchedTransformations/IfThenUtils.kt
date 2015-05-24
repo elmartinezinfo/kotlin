@@ -33,6 +33,7 @@ import org.jetbrains.kotlin.resolve.BindingContextUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.bindingContextUtil.isUsedAsStatement
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowValueFactory
+import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 
 val NULL_PTR_EXCEPTION_FQ = "java.lang.NullPointerException"
 val KOTLIN_NULL_PTR_EXCEPTION_FQ = "kotlin.KotlinNullPointerException"
@@ -133,7 +134,7 @@ fun JetPostfixExpression.inlineBaseExpressionIfApplicableWithPrompt(editor: Edit
 }
 
 fun JetExpression.isStableVariable(): Boolean {
-    val context = this.analyze()
+    val context = this.analyze(bodyResolveMode = BodyResolveMode.PARTIAL)
     val descriptor = BindingContextUtils.extractVariableDescriptorIfAny(context, this, false)
     return descriptor is VariableDescriptor &&
            DataFlowValueFactory.isStableVariable(descriptor, DescriptorUtils.getContainingModule(descriptor))

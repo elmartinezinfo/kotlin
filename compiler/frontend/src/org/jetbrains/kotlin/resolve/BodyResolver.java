@@ -127,8 +127,8 @@ public class BodyResolver {
     //}
 
     private void resolveBehaviorDeclarationBodies(@NotNull BodiesResolveContext c, Function0<Unit> resolveBodiesFun) {
-        Profiler profiler1 = Profiler.create("Body resolve one 1111");
-        profiler1.start();
+        //Profiler profiler1 = Profiler.create("Body resolve one 1111");
+        //profiler1.start();
         resolveDelegationSpecifierLists(c);
 
         resolvePropertyDeclarationBodies(c);
@@ -136,28 +136,28 @@ public class BodyResolver {
         resolveAnonymousInitializers(c);
         resolvePrimaryConstructorParameters(c);
         resolveSecondaryConstructors(c);
-        profiler1.end();
+        //profiler1.end();
 
-        Profiler profiler2 = Profiler.create("Body resolve one 2222");
-        profiler2.start();
+        //Profiler profiler2 = Profiler.create("Body resolve one 2222");
+        //profiler2.start();
         // resolveFunctionBodies(c);
 
         // Temp
         resolveBodiesFun.invoke();
 
-        profiler2.end();
+        //profiler2.end();
 
-        Profiler profiler3 = Profiler.create("Body resolve one 3333");
-        profiler3.start();
+        //Profiler profiler3 = Profiler.create("Body resolve one 3333");
+        //profiler3.start();
         // SCRIPT: resolve script bodies
         scriptBodyResolverResolver.resolveScriptBodies(c);
-        profiler3.end();
+        //profiler3.end();
 
         if (!c.getTopDownAnalysisMode().getIsLocalDeclarations()) {
-            Profiler profiler4 = Profiler.create("Body resolve one 4444");
-            profiler4.start();
+            //Profiler profiler4 = Profiler.create("Body resolve one 4444");
+            //profiler4.start();
             computeDeferredTypes();
-            profiler4.end();
+            //profiler4.end();
         }
 
 
@@ -273,25 +273,25 @@ public class BodyResolver {
     }
 
     public void resolveBodies(@NotNull BodiesResolveContext c, Function0<Unit> resolveBodiesFun) {
-        Profiler profiler1 = Profiler.create("Body resolve one");
-        profiler1.start();
+        //Profiler profiler1 = Profiler.create("Body resolve one");
+        //profiler1.start();
         resolveBehaviorDeclarationBodies(c, resolveBodiesFun);
-        profiler1.end();
+        //profiler1.end();
 
-        Profiler profiler2 = Profiler.create("Body resolve two");
-        profiler2.start();
+        //Profiler profiler2 = Profiler.create("Body resolve two");
+        //profiler2.start();
         controlFlowAnalyzer.process(c);
-        profiler2.end();
+        //profiler2.end();
 
-        Profiler profiler3 = Profiler.create("Body resolve three");
-        profiler3.start();
+        //Profiler profiler3 = Profiler.create("Body resolve three");
+        //profiler3.start();
         declarationsChecker.process(c);
-        profiler3.end();
+        //profiler3.end();
 
-        Profiler profiler4 = Profiler.create("Body resolve four");
-        profiler4.start();
+        //Profiler profiler4 = Profiler.create("Body resolve four");
+        //profiler4.start();
         functionAnalyzerExtension.process(c);
-        profiler4.end();
+        //profiler4.end();
     }
 
     private void resolveDelegationSpecifierLists(@NotNull BodiesResolveContext c) {
@@ -751,19 +751,24 @@ public class BodyResolver {
             //Profiler profiler = Profiler.create("Function: " + declaration.getName());
             //profiler.start();
 
-            SimpleFunctionDescriptor descriptor = entry.getValue();
-
-            computeDeferredType(descriptor.getReturnType());
-
-            JetScope declaringScope = c.getDeclaringScope(declaration);
-            assert declaringScope != null;
-
-            resolveFunctionBody(c.getOuterDataFlowInfo(), trace, declaration, descriptor, declaringScope);
-
-            assert descriptor.getReturnType() != null;
+            resolveFunctionBody(c, declaration, entry.getValue());
 
             //profiler.end();
         }
+    }
+
+    public void resolveFunctionBody(
+            @NotNull BodiesResolveContext c,
+            @NotNull JetNamedFunction declaration,
+            @NotNull SimpleFunctionDescriptor descriptor) {
+        computeDeferredType(descriptor.getReturnType());
+
+        JetScope declaringScope = c.getDeclaringScope(declaration);
+        assert declaringScope != null;
+
+        resolveFunctionBody(c.getOuterDataFlowInfo(), trace, declaration, descriptor, declaringScope);
+
+        assert descriptor.getReturnType() != null;
     }
 
     public void resolveFunctionBody(

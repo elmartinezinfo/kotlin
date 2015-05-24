@@ -14,14 +14,9 @@
  * limitations under the License.
  */
 
-package org.jetbrains.kotlin.js.test.semantics;
+package kotlin.test
 
-import junit.framework.Test;
-
-@SuppressWarnings("JUnitTestCaseWithNoTests")
-public final class StdLibSetJsTest extends JsUnitTestBase {
-    public static Test suite() throws Exception {
-        return createTestSuiteForFile("libraries/stdlib/test/js/SetJsTest.kt");
-    }
+public fun assertTypeEquals(expected: Any?, actual: Any?) {
+    //TODO: find analogue
+    //assertEquals(expected?.javaClass, actual?.javaClass)
 }
-

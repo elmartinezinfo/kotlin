@@ -20,15 +20,13 @@ import org.jetbrains.kotlin.psi.JetElement
 import org.jetbrains.kotlin.psi.JetBlockExpression
 import org.jetbrains.kotlin.psi.JetPsiUtil
 
-public open class StatementFilter(val name: String = "unknown") {
+public open class StatementFilter {
     public open val filter: ((JetElement) -> Boolean)?
         get() = null
 
     companion object {
-        public val NONE: StatementFilter = StatementFilter("NONE")
+        public val NONE: StatementFilter = StatementFilter()
     }
-
-    override fun toString(): String = name
 }
 
 fun StatementFilter.filterStatements(block: JetBlockExpression): List<JetElement> {

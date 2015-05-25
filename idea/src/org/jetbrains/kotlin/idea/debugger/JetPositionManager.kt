@@ -212,6 +212,9 @@ public class JetPositionManager(private val myDebugProcess: DebugProcess) : Mult
         if (psiElement == null) {
             return null
         }
+
+        if (DumbService.getInstance(psiElement.getProject()).isDumb()) return null
+
         return classNameForPosition(psiElement)
     }
 

@@ -3,6 +3,7 @@ package test.collections
 import java.util.*
 import kotlin.test.*
 import org.junit.Test as test
+import test.collections.behaviors.*
 
 class CollectionTest {
 
@@ -520,4 +521,25 @@ class CollectionTest {
         assertEquals(d, 4)
         assertEquals(e, 5)
     }
+
+
+    test fun specialLists() {
+        compare(arrayListOf<Int>(), listOf<Int>()) { listBehavior() }
+        compare(arrayListOf<Double>(), emptyList<Double>()) { listBehavior() }
+        compare(arrayListOf("value"), listOf("value")) { listBehavior() }
+    }
+
+    test fun specialSets() {
+        compare(linkedSetOf<Int>(), setOf<Int>()) { setBehavior() }
+        compare(hashSetOf<Double>(), emptySet<Double>()) { setBehavior() }
+        compare(listOf("value").toMutableSet(), setOf("value")) { setBehavior() }
+    }
+
+    test fun specialMaps() {
+        compare(hashMapOf<String, Int>(), mapOf<String, Int>()) { mapBehavior() }
+        compare(linkedMapOf<Int, String>(), emptyMap<Int, String>()) { mapBehavior() }
+        compare(linkedMapOf(2 to 3), mapOf(2 to 3)) { mapBehavior() }
+    }
+
 }
+

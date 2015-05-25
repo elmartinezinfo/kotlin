@@ -32,38 +32,57 @@ import com.intellij.debugger.settings.DebuggerSettings
 
 public abstract class AbstractKotlinSteppingTest : KotlinDebuggerTestBase() {
     protected fun doStepIntoTest(path: String) {
-        val fileText = FileUtil.loadFile(File(path))
-
-        configureSettings(fileText)
-
-        createDebugProcess(path)
-        val count = findStringWithPrefixes(fileText, "// STEP_INTO: ")?.toInt() ?: 1
-
-        for (i in 1..count) {
-            onBreakpoint { stepInto() }
-        }
-
-        finish()
+        doTest(path, "STEP_INTO")
     }
 
     protected fun doStepOutTest(path: String) {
+        doTest(path, "STEP_OUT")
+    }
+
+    protected fun doSmartStepIntoTest(path: String) {
+        doTest(path, "SMART_STEP_INTO")
+    }
+
+    protected fun doCustomTest(path: String) {
         val fileText = FileUtil.loadFile(File(path))
-
         configureSettings(fileText)
-
+        createAdditionalBreakpoints(fileText)
         createDebugProcess(path)
-        val count = findStringWithPrefixes(fileText, "// STEP_OUT: ")?.toInt() ?: 1
 
-        for (i in 1..count) {
-            onBreakpoint { stepOut() }
+        fun repeat(indexPrefix: String, f: SuspendContextImpl.() -> Unit) {
+            for (i in 1..(getPrefixedInt(fileText, indexPrefix) ?: 1)) {
+                onBreakpoint(f)
+            }
+        }
+
+        File(path).readLines().forEach {
+            when {
+                it.startsWith("// STEP_INTO") -> repeat("// STEP_INTO: ") { stepInto() }
+                it.startsWith("// STEP_OUT") -> repeat("// STEP_OUT: ") { stepOut() }
+                it.startsWith("// SMART_STEP_INTO") -> repeat("// SMART_STEP_INTO: ") { smartStepInto() }
+            }
         }
 
         finish()
     }
 
-    protected fun doSmartStepIntoTest(path: String) {
+    private fun doTest(path: String, command: String) {
+        val fileText = FileUtil.loadFile(File(path))
+
+        configureSettings(fileText)
+
         createDebugProcess(path)
-        onBreakpoint { smartStepInto() }
+
+        for (i in 1..(getPrefixedInt(fileText, "// $command: ") ?: 1)) {
+            onBreakpoint {
+                when(command) {
+                    "STEP_INTO" -> stepInto()
+                    "STEP_OUT" -> stepOut()
+                    "SMART_STEP_INTO" -> smartStepInto()
+                }
+            }
+        }
+
         finish()
     }
 

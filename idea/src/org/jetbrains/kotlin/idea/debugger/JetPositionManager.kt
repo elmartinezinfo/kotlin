@@ -217,10 +217,15 @@ public class JetPositionManager(private val myDebugProcess: DebugProcess) : Mult
 
     private fun classNameForPosition(element: PsiElement): String? {
         return runReadAction {
-            val file = element.getContainingFile() as JetFile
-            val isInLibrary = LibraryUtil.findLibraryEntry(file.getVirtualFile(), file.getProject()) != null
-            val typeMapper = if (!isInLibrary) prepareTypeMapper(file) else createTypeMapperForLibraryFile(element, file)
-            getInternalClassNameForElement(element, typeMapper, file, isInLibrary).className
+            if (DumbService.getInstance(element.getProject()).isDumb()) {
+                null
+            }
+            else {
+                val file = element.getContainingFile() as JetFile
+                val isInLibrary = LibraryUtil.findLibraryEntry(file.getVirtualFile(), file.getProject()) != null
+                val typeMapper = if (!isInLibrary) prepareTypeMapper(file) else createTypeMapperForLibraryFile(element, file)
+                getInternalClassNameForElement(element, typeMapper, file, isInLibrary).className
+            }
         }
     }
 
@@ -321,7 +326,7 @@ public class JetPositionManager(private val myDebugProcess: DebugProcess) : Mult
                     if (parent is JetObjectDeclaration && parent.isCompanion()) {
                         return PositionedElement(getInternalClassNameForElement(parent.getParent(), typeMapper, file, isInLibrary).className, parent)
                     }
-                    return getInternalClassNameForElement(element, typeMapper, file, isInLibrary)
+                    return getInternalClassNameForElement(element.getParent(), typeMapper, file, isInLibrary)
                 }
                 element is JetProperty && (!element.isTopLevel() || !isInLibrary) -> {
                     if (isInPropertyAccessor(notPositionedElement)) {
@@ -343,7 +348,7 @@ public class JetPositionManager(private val myDebugProcess: DebugProcess) : Mult
                         return getInternalClassNameForElement(element.getParent(), typeMapper, file, isInLibrary)
                     }
 
-                    val parent = getElementToCalculateClassName(element)
+                    val parent = getElementToCalculateClassName(element.getParent())
                     if (parent is JetClassOrObject) {
                         return PositionedElement(getJvmInternalNameForImpl(typeMapper, parent), element)
                     }
@@ -369,13 +374,18 @@ public class JetPositionManager(private val myDebugProcess: DebugProcess) : Mult
             return PositionedElement(PackagePartClassUtils.getPackagePartInternalName(file), element)
         }
 
-        private fun getElementToCalculateClassName(notPositionedElement: PsiElement?): JetElement? =
-            PsiTreeUtil.getParentOfType(notPositionedElement,
-                                        javaClass<JetClassOrObject>(),
-                                        javaClass<JetFunctionLiteral>(),
-                                        javaClass<JetNamedFunction>(),
-                                        javaClass<JetProperty>(),
-                                        javaClass<JetClassInitializer>())
+        private val TYPES_TO_CALCULATE_CLASSNAME: Array<Class<out JetElement>> =
+                arrayOf(javaClass<JetClassOrObject>(),
+                        javaClass<JetFunctionLiteral>(),
+                        javaClass<JetNamedFunction>(),
+                        javaClass<JetProperty>(),
+                        javaClass<JetClassInitializer>())
+
+        private fun getElementToCalculateClassName(notPositionedElement: PsiElement?): JetElement? {
+            if (notPositionedElement?.javaClass in TYPES_TO_CALCULATE_CLASSNAME ) return notPositionedElement as JetElement
+
+            return PsiTreeUtil.getParentOfType(notPositionedElement, *TYPES_TO_CALCULATE_CLASSNAME)
+        }
 
         public fun getJvmInternalNameForPropertyOwner(typeMapper: JetTypeMapper, descriptor: PropertyDescriptor): String {
             return typeMapper.mapOwner(

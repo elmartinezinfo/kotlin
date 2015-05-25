@@ -26,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.descriptors.*;
 import org.jetbrains.kotlin.lexer.JetTokens;
 import org.jetbrains.kotlin.psi.*;
+import org.jetbrains.kotlin.psi.psiUtil.PsiUtilPackage;
 import org.jetbrains.kotlin.resolve.calls.CallResolver;
 import org.jetbrains.kotlin.resolve.calls.checkers.CallChecker;
 import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall;
@@ -43,7 +44,6 @@ import org.jetbrains.kotlin.types.expressions.typeInfoFactory.TypeInfoFactoryPac
 import org.jetbrains.kotlin.util.Box;
 import org.jetbrains.kotlin.util.ReenteringLazyValueComputationException;
 import org.jetbrains.kotlin.util.slicedMap.WritableSlice;
-import org.jetbrains.kotlin.utils.Profiler;
 
 import javax.inject.Inject;
 import java.util.*;
@@ -748,27 +748,11 @@ public class BodyResolver {
         for (Map.Entry<JetNamedFunction, SimpleFunctionDescriptor> entry : c.getFunctions().entrySet()) {
             JetNamedFunction declaration = entry.getKey();
 
-            //Profiler profiler = Profiler.create("Function: " + declaration.getName());
-            //profiler.start();
+            JetScope scope = c.getDeclaringScope(declaration);
+            assert scope != null : "Scope is null: " + PsiUtilPackage.getElementTextWithContext(declaration);
 
-            resolveFunctionBody(c, declaration, entry.getValue());
-
-            //profiler.end();
+            resolveFunctionBody(c.getOuterDataFlowInfo(), trace, declaration, entry.getValue(), scope);
         }
-    }
-
-    public void resolveFunctionBody(
-            @NotNull BodiesResolveContext c,
-            @NotNull JetNamedFunction declaration,
-            @NotNull SimpleFunctionDescriptor descriptor) {
-        computeDeferredType(descriptor.getReturnType());
-
-        JetScope declaringScope = c.getDeclaringScope(declaration);
-        assert declaringScope != null;
-
-        resolveFunctionBody(c.getOuterDataFlowInfo(), trace, declaration, descriptor, declaringScope);
-
-        assert descriptor.getReturnType() != null;
     }
 
     public void resolveFunctionBody(
@@ -778,7 +762,10 @@ public class BodyResolver {
             @NotNull FunctionDescriptor functionDescriptor,
             @NotNull JetScope declaringScope
     ) {
+        computeDeferredType(functionDescriptor.getReturnType());
         resolveFunctionBody(outerDataFlowInfo, trace, function, functionDescriptor, declaringScope, null, null);
+
+        assert functionDescriptor.getReturnType() != null;
     }
 
     public void resolveFunctionBody(

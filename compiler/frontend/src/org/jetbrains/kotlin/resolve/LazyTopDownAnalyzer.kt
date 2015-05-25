@@ -262,7 +262,7 @@ public class LazyTopDownAnalyzer {
                     assert(descriptor.getReturnType() != null)
                 }
                 else {
-                    bodyResolver!!.resolveFunctionBody(c, declaration, descriptor)
+                    bodyResolver!!.resolveFunctionBody(c.getOuterDataFlowInfo(), trace!!, declaration, descriptor, c.getDeclaringScope(declaration)!!)
                 }
             }
         }

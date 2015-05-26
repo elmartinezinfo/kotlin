@@ -39,6 +39,7 @@ private val DIAGNOSTIC_FACTORY_TO_RENDERER by Delegates.lazy {
         put(ErrorsJs.NON_TOPLEVEL_CLASS_DECLARATION, "Non-toplevel {0} declarations not supported yet", Renderers.STRING)
         put(ErrorsJs.SECONDARY_CONSTRUCTOR, "Secondary constructors not supported yet")
         put(ErrorsJs.JSCODE_NO_JAVASCRIPT_PRODUCED, "Argument must be non-empty JavaScript code")
+        put(ErrorsJs.COULD_NOT_INLINE_FROM_LIBRARY, "Could not inline call: function definition not found in libraries' files")
 
         this
     }

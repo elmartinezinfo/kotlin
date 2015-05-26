@@ -18,17 +18,10 @@ package org.jetbrains.kotlin.js.inline.context
 
 import com.google.dart.compiler.backend.js.ast.*
 import com.google.dart.compiler.backend.js.ast.metadata.staticRef
-
-import org.jetbrains.kotlin.js.inline.util.aliasArgumentsIfNeeded
-import org.jetbrains.kotlin.js.inline.util.getInnerFunction
-import org.jetbrains.kotlin.js.inline.util.getSimpleName
-import org.jetbrains.kotlin.js.inline.util.isCallInvocation
-import org.jetbrains.kotlin.js.inline.util.isFunctionCreator
-
 import com.intellij.util.containers.ContainerUtil
-import java.util.IdentityHashMap
 import org.jetbrains.kotlin.js.inline.FunctionReader
-import com.google.dart.compiler.backend.js.ast.metadata.descriptor
+import org.jetbrains.kotlin.js.inline.util.*
+import java.util.IdentityHashMap
 
 abstract class FunctionContext(
         private val function: JsFunction,
@@ -44,8 +37,8 @@ abstract class FunctionContext(
 
     protected abstract fun lookUpStaticFunction(functionName: JsName?): JsFunction?
 
-    public fun getFunctionDefinition(call: JsInvocation): JsFunction {
-        return getFunctionDefinitionImpl(call)!!
+    public fun getFunctionDefinition(call: JsInvocation): JsFunction? {
+        return getFunctionDefinitionImpl(call)
     }
 
     public fun hasFunctionDefinition(call: JsInvocation): Boolean {
@@ -108,8 +101,7 @@ abstract class FunctionContext(
      *    in case of local function with closure.
      */
     private fun getFunctionDefinitionImpl(call: JsInvocation): JsFunction? {
-        val descriptor = call.descriptor
-        if (descriptor != null && descriptor in functionReader) return functionReader[descriptor]
+        if (call in functionReader) return functionReader[call]
 
         /** remove ending `()` */
         var callQualifier = call.getQualifier()

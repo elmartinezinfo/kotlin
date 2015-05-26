@@ -16,16 +16,18 @@
 
 package org.jetbrains.kotlin.js.descriptorUtils
 
-import org.jetbrains.kotlin.builtins.KotlinBuiltIns
-import org.jetbrains.kotlin.descriptors.ClassifierDescriptor
+import com.intellij.openapi.util.text.StringUtil
+import org.jetbrains.kotlin.descriptors.PackageFragmentProvider
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
+import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl
+import org.jetbrains.kotlin.js.analyze.TopDownAnalyzerFacadeForJS
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.DescriptorUtils
-import org.jetbrains.kotlin.types.JetType
-import org.jetbrains.kotlin.types.TypeProjection
-
-import com.intellij.openapi.util.text.StringUtil
 import org.jetbrains.kotlin.resolve.descriptorUtil.builtIns
+import org.jetbrains.kotlin.serialization.js.KotlinJavascriptSerializationUtil
+import org.jetbrains.kotlin.storage.StorageManager
+import org.jetbrains.kotlin.types.JetType
+import org.jetbrains.kotlin.utils.KotlinJavascriptMetadata
 
 public val JetType.nameIfStandardType: Name?
     get() {
@@ -56,4 +58,13 @@ public fun JetType.getJetTypeFqName(printTypeArguments: Boolean): String {
     }
 
     return DescriptorUtils.getFqName(declaration).asString() + typeArgumentsAsString
+}
+
+public fun ModuleDescriptor(
+        metadata: KotlinJavascriptMetadata, storageManager: StorageManager
+): ModuleDescriptorImpl {
+    val moduleDescriptor = ModuleDescriptorImpl(Name.special("<" + metadata.moduleName + ">"), storageManager, TopDownAnalyzerFacadeForJS.JS_MODULE_PARAMETERS)
+    val provider = KotlinJavascriptSerializationUtil.createPackageFragmentProvider(moduleDescriptor, metadata.body, storageManager)
+    moduleDescriptor.initialize(provider ?: PackageFragmentProvider.Empty)
+    return moduleDescriptor
 }

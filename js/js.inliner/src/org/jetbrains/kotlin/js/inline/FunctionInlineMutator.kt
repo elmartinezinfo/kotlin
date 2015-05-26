@@ -41,7 +41,7 @@ class FunctionInlineMutator private (private val call: JsInvocation, private val
     init {
 
         val functionContext = inliningContext.functionContext
-        invokedFunction = functionContext.getFunctionDefinition(call)
+        invokedFunction = functionContext.getFunctionDefinition(call)!!
         body = invokedFunction.getBody().deepCopy()
         isResultNeeded = isResultNeeded(call)
         namingContext = inliningContext.newNamingContext()

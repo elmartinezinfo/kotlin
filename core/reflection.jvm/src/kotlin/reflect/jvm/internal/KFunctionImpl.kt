@@ -21,4 +21,4 @@ import kotlin.jvm.internal.FunctionImpl
 /**
  * @suppress
  */
-public abstract class KFunctionImpl<out R> : FunctionImpl<R>()
+public abstract class KFunctionImpl<out R> : FunctionImpl()

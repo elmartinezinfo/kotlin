@@ -411,6 +411,8 @@ public interface Errors {
     DiagnosticFactory1<JetExpression, JetType> MISSING_RECEIVER = DiagnosticFactory1.create(ERROR);
     DiagnosticFactory0<JetExpression> NO_RECEIVER_ALLOWED = DiagnosticFactory0.create(ERROR);
 
+    DiagnosticFactory0<JetExpression> FREE_FUNCTION_CALLED_AS_EXTENSION = DiagnosticFactory0.create(ERROR);
+
     // Call resolution
 
     DiagnosticFactory1<JetExpression, String> ILLEGAL_SELECTOR = DiagnosticFactory1.create(ERROR);
@@ -445,8 +447,6 @@ public interface Errors {
     DiagnosticFactory2<JetExpression, JetType, JetType> TYPE_INFERENCE_EXPECTED_TYPE_MISMATCH = DiagnosticFactory2.create(ERROR);
 
     // Reflection
-
-    DiagnosticFactory0<PsiElement> REFLECTION_TYPES_NOT_LOADED = DiagnosticFactory0.create(ERROR);
 
     DiagnosticFactory1<JetExpression, CallableMemberDescriptor> EXTENSION_IN_CLASS_REFERENCE_NOT_ALLOWED = DiagnosticFactory1.create(ERROR);
     DiagnosticFactory0<JetExpression> CALLABLE_REFERENCE_LHS_NOT_A_CLASS = DiagnosticFactory0.create(ERROR);

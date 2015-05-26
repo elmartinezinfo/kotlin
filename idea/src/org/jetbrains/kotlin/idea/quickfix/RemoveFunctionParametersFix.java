@@ -19,7 +19,8 @@ package org.jetbrains.kotlin.idea.quickfix;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
-import kotlin.ExtensionFunction0;
+import kotlin.jvm.functions.*;
+import kotlin.*;
 import kotlin.Unit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor;
@@ -64,7 +65,7 @@ public class RemoveFunctionParametersFix extends ChangeFunctionSignatureFix {
             public JetMethodDescriptor configure(@NotNull JetMethodDescriptor originalDescriptor, @NotNull BindingContext bindingContext) {
                 return ChangeSignaturePackage.modify(
                         originalDescriptor,
-                        new ExtensionFunction0<JetMutableMethodDescriptor, Unit>() {
+                        new Function1<JetMutableMethodDescriptor, Unit>() {
                             @Override
                             public Unit invoke(JetMutableMethodDescriptor descriptor) {
                                 int index = functionDescriptor.getValueParameters().indexOf(parameterToRemove);

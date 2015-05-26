@@ -16,21 +16,26 @@
 
 package org.jetbrains.kotlin.builtins;
 
-import kotlin.Function1;
+import kotlin.jvm.functions.*;
+import kotlin.*;
 import kotlin.KotlinPackage;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.kotlin.builtins.functions.BuiltInFictitiousFunctionClassFactory;
+import org.jetbrains.kotlin.builtins.functions.FunctionClassDescriptor;
 import org.jetbrains.kotlin.descriptors.*;
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor;
+import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptorImpl;
 import org.jetbrains.kotlin.descriptors.annotations.Annotations;
+import org.jetbrains.kotlin.descriptors.annotations.AnnotationsImpl;
 import org.jetbrains.kotlin.descriptors.impl.ModuleDescriptorImpl;
 import org.jetbrains.kotlin.descriptors.impl.ValueParameterDescriptorImpl;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.name.FqNameUnsafe;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.resolve.DescriptorUtils;
+import org.jetbrains.kotlin.resolve.constants.CompileTimeConstant;
 import org.jetbrains.kotlin.resolve.scopes.JetScope;
-import org.jetbrains.kotlin.serialization.deserialization.FlexibleTypeCapabilitiesDeserializer;
 import org.jetbrains.kotlin.storage.LockBasedStorageManager;
 import org.jetbrains.kotlin.types.*;
 import org.jetbrains.kotlin.types.checker.JetTypeChecker;
@@ -38,15 +43,13 @@ import org.jetbrains.kotlin.types.checker.JetTypeChecker;
 import java.io.InputStream;
 import java.util.*;
 
-import static kotlin.KotlinPackage.single;
+import static kotlin.KotlinPackage.*;
 import static org.jetbrains.kotlin.builtins.PrimitiveType.*;
 import static org.jetbrains.kotlin.resolve.DescriptorUtils.getFqName;
 
 public class KotlinBuiltIns {
     public static final Name BUILT_INS_PACKAGE_NAME = Name.identifier("kotlin");
     public static final FqName BUILT_INS_PACKAGE_FQ_NAME = FqName.topLevel(BUILT_INS_PACKAGE_NAME);
-
-    public static final int FUNCTION_TRAIT_COUNT = 23;
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -113,8 +116,10 @@ public class KotlinBuiltIns {
         );
 
         PackageFragmentProvider packageFragmentProvider = BuiltinsPackage.createBuiltInPackageFragmentProvider(
-                storageManager, builtInsModule, Collections.singleton(BUILT_INS_PACKAGE_FQ_NAME),
-                FlexibleTypeCapabilitiesDeserializer.ThrowException.INSTANCE$, new Function1<String, InputStream>() {
+                storageManager, builtInsModule,
+                setOf(BUILT_INS_PACKAGE_FQ_NAME, BuiltinsPackage.getKOTLIN_REFLECT_FQ_NAME()),
+                new BuiltInFictitiousFunctionClassFactory(storageManager, builtInsModule),
+                new Function1<String, InputStream>() {
                     @Override
                     public InputStream invoke(String path) {
                         return KotlinBuiltIns.class.getClassLoader().getResourceAsStream(path);
@@ -158,13 +163,11 @@ public class KotlinBuiltIns {
         public final FqNameUnsafe array = fqNameUnsafe("Array");
 
         public final FqNameUnsafe _boolean = fqNameUnsafe("Boolean");
-
         public final FqNameUnsafe _char = fqNameUnsafe("Char");
         public final FqNameUnsafe _byte = fqNameUnsafe("Byte");
         public final FqNameUnsafe _short = fqNameUnsafe("Short");
         public final FqNameUnsafe _int = fqNameUnsafe("Int");
         public final FqNameUnsafe _long = fqNameUnsafe("Long");
-
         public final FqNameUnsafe _float = fqNameUnsafe("Float");
         public final FqNameUnsafe _double = fqNameUnsafe("Double");
 
@@ -174,6 +177,7 @@ public class KotlinBuiltIns {
         public final FqName inline = fqName("inline");
         public final FqName noinline = fqName("noinline");
         public final FqName inlineOptions = fqName("inlineOptions");
+        public final FqName extension = fqName("extension");
 
         public final FqNameUnsafe kClass = new FqName("kotlin.reflect.KClass").toUnsafe();
 
@@ -188,9 +192,6 @@ public class KotlinBuiltIns {
             }
         }
 
-        public final Set<FqNameUnsafe> functionClasses = computeIndexedFqNames("Function", FUNCTION_TRAIT_COUNT);
-        public final Set<FqNameUnsafe> extensionFunctionClasses = computeIndexedFqNames("ExtensionFunction", FUNCTION_TRAIT_COUNT);
-
         @NotNull
         private static FqNameUnsafe fqNameUnsafe(@NotNull String simpleName) {
             return fqName(simpleName).toUnsafe();
@@ -199,15 +200,6 @@ public class KotlinBuiltIns {
         @NotNull
         private static FqName fqName(@NotNull String simpleName) {
             return BUILT_INS_PACKAGE_FQ_NAME.child(Name.identifier(simpleName));
-        }
-
-        @NotNull
-        private static Set<FqNameUnsafe> computeIndexedFqNames(@NotNull String prefix, int count) {
-            Set<FqNameUnsafe> result = new HashSet<FqNameUnsafe>();
-            for (int i = 0; i < count; i++) {
-                result.add(fqNameUnsafe(prefix + i));
-            }
-            return result;
         }
     }
 
@@ -342,9 +334,14 @@ public class KotlinBuiltIns {
         return getBuiltInClassByName("Function" + parameterCount);
     }
 
+    /**
+     * @return the descriptor representing the class kotlin.Function{parameterCount + 1}
+     * @deprecated there are no ExtensionFunction classes anymore, use {@link #getFunction(int)} instead
+     */
+    @Deprecated
     @NotNull
     public ClassDescriptor getExtensionFunction(int parameterCount) {
-        return getBuiltInClassByName("ExtensionFunction" + parameterCount);
+        return getBuiltInClassByName("Function" + (parameterCount + 1));
     }
 
     @NotNull
@@ -647,6 +644,16 @@ public class KotlinBuiltIns {
     }
 
     @NotNull
+    public AnnotationDescriptor createExtensionAnnotation() {
+        return new AnnotationDescriptorImpl(getBuiltInClassByName("extension").getDefaultType(),
+                                            Collections.<ValueParameterDescriptor, CompileTimeConstant<?>>emptyMap());
+    }
+
+    private static boolean isTypeAnnotatedWithExtension(@NotNull JetType type) {
+        return type.getAnnotations().findAnnotation(FQ_NAMES.extension) != null;
+    }
+
+    @NotNull
     public JetType getFunctionType(
             @NotNull Annotations annotations,
             @Nullable JetType receiverType,
@@ -658,7 +665,17 @@ public class KotlinBuiltIns {
         ClassDescriptor classDescriptor = receiverType == null ? getFunction(size) : getExtensionFunction(size);
         TypeConstructor constructor = classDescriptor.getTypeConstructor();
 
-        return new JetTypeImpl(annotations, constructor, false, arguments, classDescriptor.getMemberScope(arguments));
+        Annotations typeAnnotations = receiverType == null ? annotations : addExtensionAnnotation(annotations);
+
+        return new JetTypeImpl(typeAnnotations, constructor, false, arguments, classDescriptor.getMemberScope(arguments));
+    }
+
+    @NotNull
+    private Annotations addExtensionAnnotation(@NotNull Annotations annotations) {
+        if (annotations.findAnnotation(FQ_NAMES.extension) != null) return annotations;
+
+        // TODO: preserve laziness of given annotations
+        return new AnnotationsImpl(plus(annotations, listOf(createExtensionAnnotation())));
     }
 
     @NotNull
@@ -733,38 +750,39 @@ public class KotlinBuiltIns {
     }
 
     public static boolean isExactFunctionOrExtensionFunctionType(@NotNull JetType type) {
-        return isExactFunctionType(type) || isExactExtensionFunctionType(type);
+        ClassifierDescriptor descriptor = type.getConstructor().getDeclarationDescriptor();
+        return descriptor != null && isNumberedFunctionClassFqName(getFqName(descriptor));
     }
 
     public static boolean isExactFunctionType(@NotNull JetType type) {
-        return isTypeConstructorFqNameInSet(type, FQ_NAMES.functionClasses);
+        return isExactFunctionOrExtensionFunctionType(type) && !isTypeAnnotatedWithExtension(type);
     }
 
     public static boolean isExactExtensionFunctionType(@NotNull JetType type) {
-        return isTypeConstructorFqNameInSet(type, FQ_NAMES.extensionFunctionClasses);
+        return isExactFunctionOrExtensionFunctionType(type) && isTypeAnnotatedWithExtension(type);
     }
 
-    public static boolean isExactFunctionType(@NotNull FqNameUnsafe fqName) {
-        return FQ_NAMES.functionClasses.contains(fqName);
-    }
+    /**
+     * @return true if this is an FQ name of a fictitious class representing the function type,
+     * e.g. kotlin.Function1 (but NOT kotlin.reflect.KFunction1)
+     */
+    public static boolean isNumberedFunctionClassFqName(@NotNull FqNameUnsafe fqName) {
+        List<Name> segments = fqName.pathSegments();
+        if (segments.size() != 2) return false;
 
-    public static boolean isExactExtensionFunctionType(@NotNull FqNameUnsafe fqName) {
-        return FQ_NAMES.extensionFunctionClasses.contains(fqName);
-    }
+        if (!BUILT_INS_PACKAGE_NAME.equals(first(segments))) return false;
 
-    private static boolean isTypeConstructorFqNameInSet(@NotNull JetType type, @NotNull Set<FqNameUnsafe> classes) {
-        ClassifierDescriptor declarationDescriptor = type.getConstructor().getDeclarationDescriptor();
-
-        if (declarationDescriptor == null) return false;
-
-        FqNameUnsafe fqName = getFqName(declarationDescriptor);
-        return classes.contains(fqName);
+        return BuiltInFictitiousFunctionClassFactory.parseClassName(
+                last(segments).asString(),
+                FunctionClassDescriptor.Kinds.Functions
+        ) != null;
     }
 
     @Nullable
     public static JetType getReceiverType(@NotNull JetType type) {
         assert isFunctionOrExtensionFunctionType(type) : type;
         if (isExtensionFunctionType(type)) {
+            // TODO: this is incorrect when a class extends from an extension function and swaps type arguments
             return type.getArguments().get(0).getType();
         }
         return null;

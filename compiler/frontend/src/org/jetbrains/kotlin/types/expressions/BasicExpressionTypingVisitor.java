@@ -21,8 +21,10 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.tree.TokenSet;
 import com.intellij.psi.util.PsiTreeUtil;
-import kotlin.Function0;
-import kotlin.Function1;
+import kotlin.jvm.functions.*;
+import kotlin.*;
+import kotlin.jvm.functions.*;
+import kotlin.*;
 import kotlin.KotlinPackage;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -49,6 +51,7 @@ import org.jetbrains.kotlin.resolve.calls.results.OverloadResolutionResultsImpl;
 import org.jetbrains.kotlin.resolve.calls.results.OverloadResolutionResultsUtil;
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfo;
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowValue;
+import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowValueFactory;
 import org.jetbrains.kotlin.resolve.calls.smartcasts.Nullability;
 import org.jetbrains.kotlin.resolve.calls.tasks.ExplicitReceiverKind;
 import org.jetbrains.kotlin.resolve.calls.tasks.ResolutionCandidate;
@@ -502,11 +505,7 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
     public JetTypeInfo visitClassLiteralExpression(@NotNull JetClassLiteralExpression expression, ExpressionTypingContext c) {
         JetType type = resolveClassLiteral(expression, c);
         if (type != null && !type.isError()) {
-            JetType kClassType = components.reflectionTypes.getKClassType(Annotations.EMPTY, type);
-            if (!kClassType.isError()) {
-                return TypeInfoFactoryPackage.createTypeInfo(kClassType, c);
-            }
-            c.trace.report(REFLECTION_TYPES_NOT_LOADED.on(expression.getDoubleColonTokenReference()));
+            return TypeInfoFactoryPackage.createTypeInfo(components.reflectionTypes.getKClassType(Annotations.EMPTY, type), c);
         }
 
         return TypeInfoFactoryPackage.createTypeInfo(ErrorUtils.createErrorType("Unresolved class"), c);
@@ -723,11 +722,6 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
                 isExtension
         );
 
-        if (type.isError()) {
-            context.trace.report(REFLECTION_TYPES_NOT_LOADED.on(expression.getDoubleColonTokenReference()));
-            return null;
-        }
-
         AnonymousFunctionDescriptor functionDescriptor = new AnonymousFunctionDescriptor(
                 context.scope.getContainingDeclaration(),
                 Annotations.EMPTY,
@@ -752,11 +746,6 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
     ) {
         JetType type = components.reflectionTypes.getKPropertyType(Annotations.EMPTY, receiverType, descriptor.getType(), isExtension,
                                                                    descriptor.isVar());
-
-        if (type.isError()) {
-            context.trace.report(REFLECTION_TYPES_NOT_LOADED.on(expression.getDoubleColonTokenReference()));
-            return null;
-        }
 
         LocalVariableDescriptor localVariable =
                 new LocalVariableDescriptor(context.scope.getContainingDeclaration(), Annotations.EMPTY, Name.special("<anonymous>"),
@@ -926,8 +915,17 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
                     JetExpression stubExpression = ExpressionTypingUtils.createFakeExpressionOfType(baseExpression.getProject(), context.trace, "$e", type);
                     checkLValue(context.trace, context, baseExpression, stubExpression);
                 }
-                // TODO : Maybe returnType?
-                result = receiverType;
+                // x++ type is x type, but ++x type is x.inc() type
+                DataFlowValue receiverValue = DataFlowValueFactory.createDataFlowValue(call.getExplicitReceiver(), contextWithExpectedType);
+                if (expression instanceof JetPrefixExpression) {
+                    result = returnType;
+                }
+                else {
+                    result = receiverType;
+                    // Also record data flow information for x++ value (= x)
+                    DataFlowValue returnValue = DataFlowValueFactory.createDataFlowValue(expression, receiverType, contextWithExpectedType);
+                    typeInfo = typeInfo.replaceDataFlowInfo(typeInfo.getDataFlowInfo().assign(returnValue, receiverValue));
+                }
             }
         }
         else {
@@ -940,7 +938,9 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
             return createCompileTimeConstantTypeInfo(value, expression, contextWithExpectedType, components.builtIns);
         }
 
-        return DataFlowUtils.checkType(typeInfo.replaceType(result), expression, contextWithExpectedType);
+        return DataFlowUtils.checkType(typeInfo.replaceType(result),
+                                       expression,
+                                       contextWithExpectedType.replaceDataFlowInfo(typeInfo.getDataFlowInfo()));
     }
 
     private JetTypeInfo visitExclExclExpression(@NotNull JetUnaryExpression expression, @NotNull ExpressionTypingContext context) {

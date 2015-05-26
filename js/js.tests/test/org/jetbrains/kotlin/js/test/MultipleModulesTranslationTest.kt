@@ -16,9 +16,12 @@
 
 package org.jetbrains.kotlin.js.test
 
+import com.google.dart.compiler.backend.js.ast.JsProgram
 import org.jetbrains.kotlin.js.config.EcmaVersion
 import org.jetbrains.kotlin.js.facade.MainCallParameters
 import org.jetbrains.kotlin.js.test.rhino.RhinoFunctionResultChecker
+import org.jetbrains.kotlin.js.test.utils.DirectiveTestUtils
+import org.jetbrains.kotlin.js.test.utils.JsTestUtils
 import org.jetbrains.kotlin.js.test.utils.JsTestUtils.getAllFilesInDir
 import org.jetbrains.kotlin.utils.KotlinJavascriptMetadataUtils
 import java.io.File
@@ -61,7 +64,7 @@ public abstract class MultipleModulesTranslationTest(main: String) : BasicTest(m
             generateJavaScriptFiles(fullFilePaths, moduleDirectoryName, MainCallParameters.noCall(), version, moduleName, libraries)
         }
     }
-
+    
     private fun getMetaFileOutputPath(moduleDirectoryName: String, version: EcmaVersion) =
         KotlinJavascriptMetadataUtils.replaceSuffix(getOutputFilePath(moduleDirectoryName, version))
 
@@ -82,8 +85,8 @@ public abstract class MultipleModulesTranslationTest(main: String) : BasicTest(m
     }
 
     private fun readModuleDependencies(testDataDir: String): Map<String, List<String>> {
-        val dependenciesTxt = File(testDataDir, "dependencies.txt")
-        assert(dependenciesTxt.exists(), "moduleDependencies should not be null")
+        val dependenciesTxt = upsearchFile(testDataDir, "dependencies.txt")
+        assert(dependenciesTxt.isFile(), "moduleDependencies should not be null")
 
         val result = LinkedHashMap<String, List<String>>()
         for (line in dependenciesTxt.readLines()) {
@@ -96,5 +99,17 @@ public abstract class MultipleModulesTranslationTest(main: String) : BasicTest(m
         }
 
         return result
+    }
+
+    private fun upsearchFile(startingDir: String, name: String): File {
+        var dir: File? = File(startingDir)
+        var file = File(dir, name)
+
+        while (dir != null && dir.isDirectory() && !file.isFile()) {
+            dir = dir.parent
+            file = File(dir, name)
+        }
+
+        return file
     }
 }

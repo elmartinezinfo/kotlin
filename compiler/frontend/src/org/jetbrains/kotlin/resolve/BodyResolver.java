@@ -19,6 +19,7 @@ package org.jetbrains.kotlin.resolve;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiManager;
 import com.intellij.util.containers.Queue;
 import kotlin.jvm.functions.Function1;
 import org.jetbrains.annotations.NotNull;
@@ -44,6 +45,7 @@ import org.jetbrains.kotlin.types.expressions.typeInfoFactory.TypeInfoFactoryPac
 import org.jetbrains.kotlin.util.Box;
 import org.jetbrains.kotlin.util.ReenteringLazyValueComputationException;
 import org.jetbrains.kotlin.util.slicedMap.WritableSlice;
+import org.jetbrains.kotlin.utils.Profiler;
 
 import javax.inject.Inject;
 import java.util.*;
@@ -754,18 +756,32 @@ public class BodyResolver {
             JetScope scope = c.getDeclaringScope(declaration);
             assert scope != null : "Scope is null: " + PsiUtilPackage.getElementTextWithContext(declaration);
 
-            if (bodyResolveTaskManager != null && !c.getTopDownAnalysisMode().getIsLocalDeclarations()) {
+            if (bodyResolveTaskManager != null && !(bodyResolveTaskManager instanceof DummyBodyResolveTaskManager) &&
+                    !c.getTopDownAnalysisMode().getIsLocalDeclarations()) {
                 BodyResolveResult result = bodyResolveTaskManager.resolveFunctionBody(declaration);
 
                 // Check resolve context..
                 assert result.getResolveContext().getDeclaringScope() == scope &&
-                        result.getResolveContext().getFunctionDescriptor() == entry.getValue() &&
-                        result.getResolveContext().getOuterDataFlowInfo() == c.getOuterDataFlowInfo();
+                       result.getResolveContext().getFunctionDescriptor() == entry.getValue() &&
+                       result.getResolveContext().getOuterDataFlowInfo() == c.getOuterDataFlowInfo();
 
                 result.getResultTrace().addAllMyDataTo(trace);
             }
             else {
+                Profiler profiler = Profiler
+                        .create("---- BodyResolve ---- " +
+                                Thread.currentThread().getName() +
+                                " " +
+                                declaration.getName() +
+                                " " +
+                                declaration.hashCode() +
+                                " " +
+                                PsiManager.getInstance(declaration.getProject()).getModificationTracker().getModificationCount()).start();
+
+
                 resolveFunctionBody(c.getOuterDataFlowInfo(), trace, declaration, entry.getValue(), scope);
+
+                profiler.end();
             }
         }
     }

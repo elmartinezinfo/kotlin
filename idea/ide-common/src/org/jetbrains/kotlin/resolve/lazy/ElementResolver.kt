@@ -354,10 +354,12 @@ public abstract class ElementResolver protected constructor(public val resolveSe
     }
 
     private fun functionAdditionalResolve(resolveSession: ResolveSession, namedFunction: JetNamedFunction, file: JetFile, statementFilter: StatementFilter): BindingTrace {
-//        val profiler = Profiler.create("${if (StatementFilter.NONE != statementFilter) "-------- Partial --------" else ""} ${Thread.currentThread().getName()} " +
-//                                       "Addition: ${namedFunction.getName()} ${namedFunction.hashCode()} $this " +
-//                                       "${PsiManager.getInstance(namedFunction.getProject()).getModificationTracker().getModificationCount()}")
-//        profiler.start()
+        val profiler = Profiler.create("${if (StatementFilter.NONE != statementFilter) "-------- Partial --------" else ""} ${Thread.currentThread().getName()} " +
+                                       "Addition: ${namedFunction.getName()} ${namedFunction.hashCode()} $this " +
+                                       "${PsiManager.getInstance(namedFunction.getProject()).getModificationTracker().getModificationCount()}")
+        profiler.start()
+
+        assert(statementFilter != StatementFilter.NONE)
 
         val trace = createDelegationTrace(namedFunction)
 
@@ -368,7 +370,7 @@ public abstract class ElementResolver protected constructor(public val resolveSe
         val bodyResolver = createBodyResolver(resolveSession, trace, file, statementFilter)
         bodyResolver.resolveFunctionBody(DataFlowInfo.EMPTY, trace, namedFunction, functionDescriptor, scope)
 
-//        profiler.end()
+        profiler.end()
 
         return trace
     }

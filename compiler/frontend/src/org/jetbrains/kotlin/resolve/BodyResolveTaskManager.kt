@@ -16,6 +16,7 @@
 
 package org.jetbrains.kotlin.resolve
 
+import com.intellij.psi.PsiManager
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.psi.JetNamedFunction
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfo
@@ -25,6 +26,7 @@ import org.jetbrains.kotlin.resolve.lazy.LazyDeclarationResolver
 import org.jetbrains.kotlin.resolve.lazy.TopLevelDescriptorProvider
 import org.jetbrains.kotlin.resolve.scopes.JetScope
 import org.jetbrains.kotlin.storage.StorageManager
+import org.jetbrains.kotlin.utils.Profiler
 import javax.inject.Inject
 import kotlin.properties.Delegates
 
@@ -60,20 +62,30 @@ public open class BodyResolveTaskManager {
         @Inject set
 
     public open fun resolveFunctionBody(function: JetNamedFunction): BodyResolveResult {
+        val profiler = Profiler.create("-- Body -- ${Thread.currentThread().getName()} ${function.getName()} ${function.hashCode()} $this " +
+                                       "${PsiManager.getInstance(function.getProject()).getModificationTracker().getModificationCount()}").start()
+
         val scope = declarationScopeProvider.getResolutionScopeForDeclaration(function)
         val functionDescriptor = lazyDeclarationResolver.resolveToDescriptor(function) as FunctionDescriptor
         val dataFlowInfo = DataFlowInfo.EMPTY
 
-        return resolveFunctionBody(function, BodyResolveContext(dataFlowInfo, trace, functionDescriptor, scope))
+        val bodyResolveResult = resolveFunctionBody(function, bodyResolver, BodyResolveContext(dataFlowInfo, trace, functionDescriptor, scope))
+        profiler.end()
+
+        return bodyResolveResult
     }
 
-    private fun resolveFunctionBody(function: JetNamedFunction, context: BodyResolveContext): BodyResolveResult {
-        val delegatingBindingTrace = DelegatingBindingTrace(context.baseTrace.getBindingContext(), "Trace to resolve element", function)
+    public open fun hasElementAdditionalResolveCached(function: JetNamedFunction): Boolean = false
 
-        ForceResolveUtil.forceResolveAllContents(context.functionDescriptor)
-        bodyResolver.resolveFunctionBody(context.outerDataFlowInfo, delegatingBindingTrace, function, context.functionDescriptor, context.declaringScope)
+    companion object {
+        public fun resolveFunctionBody(function: JetNamedFunction, bodyResolver: BodyResolver, context: BodyResolveContext): BodyResolveResult {
+            val delegatingBindingTrace = DelegatingBindingTrace(context.baseTrace.getBindingContext(), "Trace to resolve element", function)
 
-        return BodyResolveResult(delegatingBindingTrace, context)
+            ForceResolveUtil.forceResolveAllContents(context.functionDescriptor)
+            bodyResolver.resolveFunctionBody(context.outerDataFlowInfo, delegatingBindingTrace, function, context.functionDescriptor, context.declaringScope)
+
+            return BodyResolveResult(delegatingBindingTrace, context)
+        }
     }
 }
 

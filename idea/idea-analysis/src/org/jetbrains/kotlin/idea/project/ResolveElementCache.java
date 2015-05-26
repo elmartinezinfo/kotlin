@@ -44,7 +44,7 @@ import java.util.Collection;
 
 public class ResolveElementCache extends ElementResolver {
     private final Project project;
-    private BodyResolveTaskManager bodyResolveTaskManager;
+    private final BodyResolveTaskManager bodyResolveTaskManager;
     private final CachedValue<MemoizedFunctionToNotNull<JetElement, BindingTrace>> additionalResolveCache;
 
     public ResolveElementCache(ResolveSession resolveSession, Project project, final BodyResolveTaskManager bodyResolveTaskManager) {
@@ -65,8 +65,9 @@ public class ResolveElementCache extends ElementResolver {
                                             @Override
                                             public BindingTrace invoke(JetElement jetElement) {
                                                 if (jetElement instanceof JetNamedFunction) {
-                                                    // bodyResolveTaskManager.resolveFunctionBody()
+                                                    return bodyResolveTaskManager.resolveFunctionBody((JetNamedFunction)jetElement).getResultTrace();
                                                 }
+
                                                 return performElementAdditionalResolve(jetElement, jetElement, BodyResolveMode.FULL);
                                             }
                                         });
@@ -87,6 +88,10 @@ public class ResolveElementCache extends ElementResolver {
 
     @Override
     public boolean hasElementAdditionalResolveCached(@NotNull JetElement jetElement) {
+        if (jetElement instanceof JetNamedFunction) {
+            if (bodyResolveTaskManager.hasElementAdditionalResolveCached((JetNamedFunction) jetElement)) return true;
+        }
+
         if (!additionalResolveCache.hasUpToDateValue()) return false;
         return additionalResolveCache.getValue().isComputed(jetElement);
     }

@@ -40,7 +40,7 @@ import java.util.Collection;
 public class ResolveSessionForBodies implements KotlinCodeAnalyzer {
     private final Object createdForObject;
     private final ResolveSession resolveSession;
-    private final BodyResolveTaskManager bodyResolveTaskManager;
+    private BodyResolveTaskManager bodyResolveTaskManager;
     private final ResolveElementCache resolveElementCache;
 
     public ResolveSessionForBodies(@NotNull Project project, @NotNull ResolveSession resolveSession, @NotNull BodyResolveTaskManager bodyResolveTaskManager) {
@@ -137,20 +137,13 @@ public class ResolveSessionForBodies implements KotlinCodeAnalyzer {
     }
 
     @NotNull
-    @Override
-    public PackageFragmentProvider getPackageFragmentProvider() {
-        return resolveSession.getPackageFragmentProvider();
+    public BodyResolveTaskManager getBodyResolveTaskManager() {
+        return bodyResolveTaskManager;
     }
 
     @NotNull
-    //@Override
-    public DelegatingBindingTrace resolveFunctionBody(
-            @NotNull DataFlowInfo outerDataFlowInfo,
-            @NotNull BindingTrace baseTrace,
-            @NotNull JetNamedFunction function,
-            @NotNull FunctionDescriptor functionDescriptor,
-            @NotNull JetScope declaringScope) {
-        // return resolveElementCache.getElementAdditionalResolve(namedFunction);
-        return null;
+    @Override
+    public PackageFragmentProvider getPackageFragmentProvider() {
+        return resolveSession.getPackageFragmentProvider();
     }
 }

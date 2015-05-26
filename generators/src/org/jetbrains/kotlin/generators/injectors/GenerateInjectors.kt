@@ -104,6 +104,7 @@ private fun generatorForLazyBodyResolve() =
             parameter<BindingTrace>()
             parameter<AdditionalCheckerProvider>(useAsContext = true)
             parameter<DynamicTypesSettings>()
+            parameter<BodyResolveTaskManager>()
 
             publicField<LazyTopDownAnalyzerForTopLevel>()
         }

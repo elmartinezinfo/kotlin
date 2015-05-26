@@ -28,9 +28,9 @@ import org.jetbrains.kotlin.resolve.BindingTrace;
 import org.jetbrains.kotlin.resolve.AdditionalCheckerProvider;
 import org.jetbrains.kotlin.resolve.validation.SymbolUsageValidator;
 import org.jetbrains.kotlin.types.DynamicTypesSettings;
+import org.jetbrains.kotlin.resolve.BodyResolveTaskManager;
 import org.jetbrains.kotlin.resolve.LazyTopDownAnalyzerForTopLevel;
 import org.jetbrains.kotlin.resolve.LazyTopDownAnalyzer;
-import org.jetbrains.kotlin.resolve.BodyResolveTaskManager;
 import org.jetbrains.kotlin.resolve.BodyResolver;
 import org.jetbrains.kotlin.resolve.AnnotationResolver;
 import org.jetbrains.kotlin.resolve.calls.CallResolver;
@@ -61,9 +61,9 @@ import org.jetbrains.kotlin.resolve.DeclarationsChecker;
 import org.jetbrains.kotlin.resolve.ModifiersChecker;
 import org.jetbrains.kotlin.resolve.FunctionAnalyzerExtension;
 import org.jetbrains.kotlin.resolve.ScriptBodyResolver;
+import org.jetbrains.kotlin.resolve.DeclarationResolver;
 import org.jetbrains.kotlin.resolve.lazy.DeclarationScopeProviderImpl;
 import org.jetbrains.kotlin.resolve.lazy.LazyDeclarationResolver;
-import org.jetbrains.kotlin.resolve.DeclarationResolver;
 import org.jetbrains.kotlin.resolve.OverloadResolver;
 import org.jetbrains.kotlin.resolve.OverrideResolver;
 import org.jetbrains.kotlin.resolve.varianceChecker.VarianceChecker;
@@ -86,9 +86,9 @@ public class InjectorForLazyBodyResolve {
     private final AdditionalCheckerProvider additionalCheckerProvider;
     private final SymbolUsageValidator symbolUsageValidator;
     private final DynamicTypesSettings dynamicTypesSettings;
+    private final BodyResolveTaskManager bodyResolveTaskManager;
     private final LazyTopDownAnalyzerForTopLevel lazyTopDownAnalyzerForTopLevel;
     private final LazyTopDownAnalyzer lazyTopDownAnalyzer;
-    private final BodyResolveTaskManager bodyResolveTaskManager;
     private final BodyResolver bodyResolver;
     private final AnnotationResolver annotationResolver;
     private final CallResolver callResolver;
@@ -119,9 +119,9 @@ public class InjectorForLazyBodyResolve {
     private final ModifiersChecker modifiersChecker;
     private final FunctionAnalyzerExtension functionAnalyzerExtension;
     private final ScriptBodyResolver scriptBodyResolver;
+    private final DeclarationResolver declarationResolver;
     private final DeclarationScopeProviderImpl declarationScopeProvider;
     private final LazyDeclarationResolver lazyDeclarationResolver;
-    private final DeclarationResolver declarationResolver;
     private final OverloadResolver overloadResolver;
     private final OverrideResolver overrideResolver;
     private final VarianceChecker varianceChecker;
@@ -132,7 +132,8 @@ public class InjectorForLazyBodyResolve {
         @NotNull FileScopeProvider fileScopeProvider,
         @NotNull BindingTrace bindingTrace,
         @NotNull AdditionalCheckerProvider additionalCheckerProvider,
-        @NotNull DynamicTypesSettings dynamicTypesSettings
+        @NotNull DynamicTypesSettings dynamicTypesSettings,
+        @NotNull BodyResolveTaskManager bodyResolveTaskManager
     ) {
         this.moduleContext = moduleContext;
         this.kotlinBuiltIns = moduleContext.getBuiltIns();
@@ -146,9 +147,9 @@ public class InjectorForLazyBodyResolve {
         this.additionalCheckerProvider = additionalCheckerProvider;
         this.symbolUsageValidator = additionalCheckerProvider.getSymbolUsageValidator();
         this.dynamicTypesSettings = dynamicTypesSettings;
+        this.bodyResolveTaskManager = bodyResolveTaskManager;
         this.lazyTopDownAnalyzerForTopLevel = new LazyTopDownAnalyzerForTopLevel();
         this.lazyTopDownAnalyzer = new LazyTopDownAnalyzer();
-        this.bodyResolveTaskManager = new BodyResolveTaskManager();
         this.bodyResolver = new BodyResolver();
         this.annotationResolver = new AnnotationResolver();
         this.callResolver = new CallResolver();
@@ -179,9 +180,9 @@ public class InjectorForLazyBodyResolve {
         this.modifiersChecker = new ModifiersChecker(bindingTrace, additionalCheckerProvider);
         this.functionAnalyzerExtension = new FunctionAnalyzerExtension();
         this.scriptBodyResolver = new ScriptBodyResolver();
+        this.declarationResolver = new DeclarationResolver();
         this.lazyDeclarationResolver = new LazyDeclarationResolver(moduleContext, bindingTrace);
         this.declarationScopeProvider = new DeclarationScopeProviderImpl(lazyDeclarationResolver);
-        this.declarationResolver = new DeclarationResolver();
         this.overloadResolver = new OverloadResolver();
         this.overrideResolver = new OverrideResolver();
         this.varianceChecker = new VarianceChecker(bindingTrace);
@@ -201,13 +202,6 @@ public class InjectorForLazyBodyResolve {
         lazyTopDownAnalyzer.setTopLevelDescriptorProvider(analyzer);
         lazyTopDownAnalyzer.setTrace(bindingTrace);
         lazyTopDownAnalyzer.setVarianceChecker(varianceChecker);
-
-        bodyResolveTaskManager.setBodyResolver(bodyResolver);
-        bodyResolveTaskManager.setDeclarationScopeProvider(declarationScopeProvider);
-        bodyResolveTaskManager.setLazyDeclarationResolver(lazyDeclarationResolver);
-        bodyResolveTaskManager.setStorageManager(storageManager);
-        bodyResolveTaskManager.setTopLevelDescriptorProvider(analyzer);
-        bodyResolveTaskManager.setTrace(bindingTrace);
 
         bodyResolver.setAdditionalCheckerProvider(additionalCheckerProvider);
         bodyResolver.setAnnotationResolver(annotationResolver);
@@ -292,13 +286,13 @@ public class InjectorForLazyBodyResolve {
         scriptBodyResolver.setAdditionalCheckerProvider(additionalCheckerProvider);
         scriptBodyResolver.setExpressionTypingServices(expressionTypingServices);
 
+        declarationResolver.setAnnotationResolver(annotationResolver);
+        declarationResolver.setTrace(bindingTrace);
+
         declarationScopeProvider.setFileScopeProvider(fileScopeProvider);
 
         lazyDeclarationResolver.setDeclarationScopeProvider(declarationScopeProvider);
         lazyDeclarationResolver.setTopLevelDescriptorProvider(analyzer);
-
-        declarationResolver.setAnnotationResolver(annotationResolver);
-        declarationResolver.setTrace(bindingTrace);
 
         overloadResolver.setTrace(bindingTrace);
 

@@ -21,27 +21,30 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.JdkOrderEntry
 import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.ModuleRootManager
+import com.intellij.psi.PsiManager
+import com.intellij.psi.util.CachedValueProvider
+import com.intellij.psi.util.CachedValuesManager
+import com.intellij.psi.util.PsiModificationTracker
 import org.jetbrains.kotlin.analyzer.*
-import org.jetbrains.kotlin.context.GlobalContextImpl
-import org.jetbrains.kotlin.context.SimpleGlobalContext
-import org.jetbrains.kotlin.context.withModule
-import org.jetbrains.kotlin.context.withProject
+import org.jetbrains.kotlin.context.*
+import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.di.InjectorForBodyResolve
 import org.jetbrains.kotlin.idea.project.ResolveSessionForBodies
 import org.jetbrains.kotlin.idea.project.TargetPlatform
 import org.jetbrains.kotlin.idea.project.TargetPlatformDetector
 import org.jetbrains.kotlin.load.java.structure.JavaClass
 import org.jetbrains.kotlin.load.java.structure.impl.JavaClassImpl
+import org.jetbrains.kotlin.psi.JetElement
 import org.jetbrains.kotlin.psi.JetFile
-import org.jetbrains.kotlin.resolve.BindingTrace
-import org.jetbrains.kotlin.resolve.BodyResolveTaskManager
-import org.jetbrains.kotlin.resolve.StatementFilter
+import org.jetbrains.kotlin.psi.JetNamedFunction
+import org.jetbrains.kotlin.resolve.*
+import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfo
 import org.jetbrains.kotlin.resolve.jvm.JvmPlatformParameters
-import org.jetbrains.kotlin.resolve.lazy.DeclarationScopeProviderImpl
-import org.jetbrains.kotlin.resolve.lazy.LazyDeclarationResolver
-import org.jetbrains.kotlin.resolve.lazy.TopLevelDescriptorProvider
+import org.jetbrains.kotlin.resolve.lazy.*
 import org.jetbrains.kotlin.storage.ExceptionTracker
+import org.jetbrains.kotlin.storage.MemoizedFunctionToNotNull
 import org.jetbrains.kotlin.types.expressions.LocalLazyDeclarationResolver
+import org.jetbrains.kotlin.utils.Profiler
 import org.jetbrains.kotlin.utils.keysToMap
 import kotlin.properties.Delegates
 
@@ -82,26 +85,9 @@ fun createModuleResolverProvider(
 
     val resolverForProject = createResolverForProject()
 
-    val moduleToBodiesResolveSession = modulesToCreateResolversFor.keysToMap {
-        module ->
-        val analyzer = resolverForProject.resolverForModule(module)
-        val resolveSession = analyzer.lazyResolveSession
-
-        // TODO: Temp
-        val bodyResolve = InjectorForBodyResolve(
-                globalContext.withProject(project).withModule(resolveSession.getModuleDescriptor()),
-                resolveSession.getTrace(), TargetPlatform.JVM.getAdditionalCheckerProvider(), StatementFilter.NONE
-        )
-
-        val bodyResolveTaskManager = BodyResolveTaskManager()
-        bodyResolveTaskManager.storageManager = resolveSession.getStorageManager()
-        bodyResolveTaskManager.bodyResolver = bodyResolve.getBodyResolver()
-        bodyResolveTaskManager.topLevelDescriptorProvider = resolveSession
-        bodyResolveTaskManager.declarationScopeProvider = resolveSession.getDescriptorResolver()
-        bodyResolveTaskManager.trace = resolveSession.getTrace()
-        bodyResolveTaskManager.lazyDeclarationResolver = LocalLazyDeclarationResolver(moduleContext, bindingTrace, localClassDescriptorHolder)
-
-        ResolveSessionForBodies(project, resolveSession, bodyResolveTaskManager)
+    val moduleToBodiesResolveSession = modulesToCreateResolversFor.keysToMap { module ->
+        val resolveSession = resolverForProject.resolverForModule(module).lazyResolveSession
+        ResolveSessionForBodies(project, resolveSession, IDEBodyResolveTaskManager(globalContext, project, resolveSession))
     }
     return ModuleResolverProviderImpl(
             resolverForProject,
@@ -109,6 +95,49 @@ fun createModuleResolverProvider(
             globalContext,
             delegateProvider
     )
+}
+
+class IDEBodyResolveTaskManager(val globalContext: GlobalContext, val project: Project, val resolveSession: ResolveSession): BodyResolveTaskManager() {
+    private val bodyResolve = InjectorForBodyResolve(
+            globalContext.withProject(project).withModule(resolveSession.getModuleDescriptor()),
+            resolveSession.getTrace(), TargetPlatform.JVM.getAdditionalCheckerProvider(), StatementFilter.NONE
+    ).getBodyResolver()
+
+    val bodyResolveCache = CachedValuesManager.getManager(project).createCachedValue<MemoizedFunctionToNotNull<JetNamedFunction, BodyResolveResult>>(
+            CachedValueProvider {
+                val manager = resolveSession.getStorageManager()
+                val functionsCacheFunction = manager.createMemoizedFunction<JetNamedFunction, BodyResolveResult> { function ->
+                    doResolveFunctionBody(function)
+                }
+
+                CachedValueProvider.Result.create<MemoizedFunctionToNotNull<JetNamedFunction, BodyResolveResult>>(
+                        functionsCacheFunction, PsiModificationTracker.MODIFICATION_COUNT, resolveSession.getExceptionTracker())
+            }, false)
+
+    override fun resolveFunctionBody(function: JetNamedFunction): BodyResolveResult {
+        return bodyResolveCache.getValue().invoke(function)
+    }
+
+    override fun hasElementAdditionalResolveCached(function: JetNamedFunction): Boolean {
+        if (!bodyResolveCache.hasUpToDateValue()) return false
+        return bodyResolveCache.getValue().isComputed(function)
+    }
+
+    private fun doResolveFunctionBody(function: JetNamedFunction): BodyResolveResult {
+        val profiler = Profiler.create("-- IDE -- ${Thread.currentThread().getName()} ${function.getName()} ${function.hashCode()} $this " +
+                                       "${PsiManager.getInstance(function.getProject()).getModificationTracker().getModificationCount()}").start()
+
+        val scope = resolveSession.getScopeProvider().getResolutionScopeForDeclaration(function)
+        val functionDescriptor = resolveSession.resolveToDescriptor(function) as FunctionDescriptor
+        val dataFlowInfo = DataFlowInfo.EMPTY
+
+        val bodyResolveResult = BodyResolveTaskManager.resolveFunctionBody(
+                function, bodyResolve, BodyResolveContext(dataFlowInfo, resolveSession.getTrace(), functionDescriptor, scope))
+
+        profiler.end()
+
+        return bodyResolveResult
+    }
 }
 
 private fun collectAllModuleInfosFromIdeaModel(project: Project): List<IdeaModuleInfo> {

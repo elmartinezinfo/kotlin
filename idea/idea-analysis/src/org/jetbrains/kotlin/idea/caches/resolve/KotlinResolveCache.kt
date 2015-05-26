@@ -120,7 +120,8 @@ private class PerFileAnalysisCache(val file: JetFile, val resolveSession: Resolv
                 resolveSession.getScopeProvider(),
                 trace,
                 targetPlatform.getAdditionalCheckerProvider(),
-                targetPlatform.getDynamicTypesSettings()
+                targetPlatform.getDynamicTypesSettings(),
+                resolveSession.getBodyResolveTaskManager()
         ).getLazyTopDownAnalyzerForTopLevel()!!
     }
 

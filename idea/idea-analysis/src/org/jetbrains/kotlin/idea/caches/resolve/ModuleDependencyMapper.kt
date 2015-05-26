@@ -124,8 +124,8 @@ class IDEBodyResolveTaskManager(val globalContext: GlobalContext, val project: P
     }
 
     private fun doResolveFunctionBody(function: JetNamedFunction): BodyResolveResult {
-        val profiler = Profiler.create("-- IDE -- ${Thread.currentThread().getName()} ${function.getName()} ${function.hashCode()} $this " +
-                                       "${PsiManager.getInstance(function.getProject()).getModificationTracker().getModificationCount()}").start()
+//        val profiler = Profiler.create("-- IDE -- ${Thread.currentThread().getName()} ${function.getName()} ${function.hashCode()} $this " +
+//                                       "${PsiManager.getInstance(function.getProject()).getModificationTracker().getModificationCount()}").start()
 
         val scope = resolveSession.getScopeProvider().getResolutionScopeForDeclaration(function)
         val functionDescriptor = resolveSession.resolveToDescriptor(function) as FunctionDescriptor
@@ -134,7 +134,7 @@ class IDEBodyResolveTaskManager(val globalContext: GlobalContext, val project: P
         val bodyResolveResult = BodyResolveTaskManager.resolveFunctionBody(
                 function, bodyResolve, BodyResolveContext(dataFlowInfo, resolveSession.getTrace(), functionDescriptor, scope))
 
-        profiler.end()
+//        profiler.end()
 
         return bodyResolveResult
     }

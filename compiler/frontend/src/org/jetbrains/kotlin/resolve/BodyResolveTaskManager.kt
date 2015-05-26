@@ -62,15 +62,15 @@ public open class BodyResolveTaskManager {
         @Inject set
 
     public open fun resolveFunctionBody(function: JetNamedFunction): BodyResolveResult {
-        val profiler = Profiler.create("-- Body -- ${Thread.currentThread().getName()} ${function.getName()} ${function.hashCode()} $this " +
-                                       "${PsiManager.getInstance(function.getProject()).getModificationTracker().getModificationCount()}").start()
+//        val profiler = Profiler.create("-- Body -- ${Thread.currentThread().getName()} ${function.getName()} ${function.hashCode()} $this " +
+//                                       "${PsiManager.getInstance(function.getProject()).getModificationTracker().getModificationCount()}").start()
 
         val scope = declarationScopeProvider.getResolutionScopeForDeclaration(function)
         val functionDescriptor = lazyDeclarationResolver.resolveToDescriptor(function) as FunctionDescriptor
         val dataFlowInfo = DataFlowInfo.EMPTY
 
         val bodyResolveResult = resolveFunctionBody(function, bodyResolver, BodyResolveContext(dataFlowInfo, trace, functionDescriptor, scope))
-        profiler.end()
+//        profiler.end()
 
         return bodyResolveResult
     }

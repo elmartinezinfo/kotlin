@@ -768,20 +768,20 @@ public class BodyResolver {
                 result.getResultTrace().addAllMyDataTo(trace);
             }
             else {
-                Profiler profiler = Profiler
-                        .create("---- BodyResolve ---- " +
-                                Thread.currentThread().getName() +
-                                " " +
-                                declaration.getName() +
-                                " " +
-                                declaration.hashCode() +
-                                " " +
-                                PsiManager.getInstance(declaration.getProject()).getModificationTracker().getModificationCount()).start();
+                //Profiler profiler = Profiler
+                //        .create("---- BodyResolve ---- " +
+                //                Thread.currentThread().getName() +
+                //                " " +
+                //                declaration.getName() +
+                //                " " +
+                //                declaration.hashCode() +
+                //                " " +
+                //                PsiManager.getInstance(declaration.getProject()).getModificationTracker().getModificationCount()).start();
 
 
                 resolveFunctionBody(c.getOuterDataFlowInfo(), trace, declaration, entry.getValue(), scope);
 
-                profiler.end();
+                //profiler.end();
             }
         }
     }

@@ -18,6 +18,7 @@ package org.jetbrains.kotlin.idea.quickfix.createFromUsage.callableBuilder
 
 import com.intellij.refactoring.psi.SearchUtils
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
+import org.jetbrains.kotlin.cfg.pseudocode.*
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
 import org.jetbrains.kotlin.descriptors.PropertyDescriptor
@@ -36,8 +37,7 @@ import org.jetbrains.kotlin.resolve.descriptorUtil.resolveTopLevelClass
 import org.jetbrains.kotlin.resolve.scopes.JetScope
 import org.jetbrains.kotlin.types.*
 import org.jetbrains.kotlin.types.checker.JetTypeChecker
-import java.util.HashSet
-import java.util.LinkedHashSet
+import java.util.*
 
 private fun JetType.contains(inner: JetType): Boolean {
     return JetTypeChecker.DEFAULT.equalTypes(this, inner) || getArguments().any { inner in it.getType() }
@@ -90,46 +90,44 @@ fun JetType.getTypeParameters(): Set<TypeParameterDescriptor> {
 fun JetExpression.guessTypes(
         context: BindingContext,
         module: ModuleDescriptor,
+        pseudocode: Pseudocode? = null,
         coerceUnusedToUnit: Boolean = true
 ): Array<JetType> {
-
     if (coerceUnusedToUnit
         && this !is JetDeclaration
         && isUsedAsStatement(context)
-        && getNonStrictParentOfType<JetAnnotationEntry>() == null) return array(module.builtIns.getUnitType())
+        && getNonStrictParentOfType<JetAnnotationEntry>() == null) return arrayOf(module.builtIns.getUnitType())
 
     // if we know the actual type of the expression
     val theType1 = context.getType(this)
     if (theType1 != null) {
         val dataFlowInfo = context[BindingContext.EXPRESSION_TYPE_INFO, this]?.dataFlowInfo
         val possibleTypes = dataFlowInfo?.getPossibleTypes(DataFlowValueFactory.createDataFlowValue(this, theType1, context, module))
-        return if (possibleTypes != null && possibleTypes.isNotEmpty()) possibleTypes.copyToArray() else array(theType1)
+        return if (possibleTypes != null && possibleTypes.isNotEmpty()) possibleTypes.toTypedArray() else arrayOf(theType1)
     }
 
     // expression has an expected type
     val theType2 = context[BindingContext.EXPECTED_EXPRESSION_TYPE, this]
-    if (theType2 != null) {
-        return array(theType2)
-    }
+    if (theType2 != null) return arrayOf(theType2)
 
     val parent = getParent()
     return when {
         this is JetTypeConstraint -> {
             // expression itself is a type assertion
             val constraint = this
-            array(context[BindingContext.TYPE, constraint.getBoundTypeReference()]!!)
+            arrayOf(context[BindingContext.TYPE, constraint.getBoundTypeReference()]!!)
         }
         parent is JetTypeConstraint -> {
             // expression is on the left side of a type assertion
             val constraint = parent
-            array(context[BindingContext.TYPE, constraint.getBoundTypeReference()]!!)
+            arrayOf(context[BindingContext.TYPE, constraint.getBoundTypeReference()]!!)
         }
         this is JetMultiDeclarationEntry -> {
             // expression is on the lhs of a multi-declaration
             val typeRef = getTypeReference()
             if (typeRef != null) {
                 // and has a specified type
-                array(context[BindingContext.TYPE, typeRef]!!)
+                arrayOf(context[BindingContext.TYPE, typeRef]!!)
             }
             else {
                 // otherwise guess
@@ -141,7 +139,7 @@ fun JetExpression.guessTypes(
             val typeRef = getTypeReference()
             if (typeRef != null) {
                 // and has a specified type
-                array(context[BindingContext.TYPE, typeRef]!!)
+                arrayOf(context[BindingContext.TYPE, typeRef]!!)
             }
             else {
                 // otherwise guess
@@ -154,7 +152,7 @@ fun JetExpression.guessTypes(
             val typeRef = variable.getTypeReference()
             if (typeRef != null) {
                 // and has a specified type
-                array(context[BindingContext.TYPE, typeRef]!!)
+                arrayOf(context[BindingContext.TYPE, typeRef]!!)
             }
             else {
                 // otherwise guess, based on LHS
@@ -165,21 +163,25 @@ fun JetExpression.guessTypes(
             val property = context[BindingContext.DECLARATION_TO_DESCRIPTOR, parent.getParent() as JetProperty] as PropertyDescriptor
             val delegateClassName = if (property.isVar()) "ReadWriteProperty" else "ReadOnlyProperty"
             val delegateClass = module.resolveTopLevelClass(FqName("kotlin.properties.$delegateClassName"))
-                                ?: return array(module.builtIns.getAnyType())
+                                ?: return arrayOf(module.builtIns.getAnyType())
             val receiverType = (property.getExtensionReceiverParameter() ?: property.getDispatchReceiverParameter())?.getType()
                                ?: module.builtIns.getNullableNothingType()
             val typeArguments = listOf(TypeProjectionImpl(receiverType), TypeProjectionImpl(property.getType()))
-            array(TypeUtils.substituteProjectionsForParameters(delegateClass, typeArguments))
+            arrayOf(TypeUtils.substituteProjectionsForParameters(delegateClass, typeArguments))
         }
         parent is JetStringTemplateEntryWithExpression && parent.getExpression() == this -> {
-            array(module.builtIns.getStringType())
+            arrayOf(module.builtIns.getStringType())
         }
-        else -> array() // can't infer anything
+        else -> {
+            pseudocode?.getElementValue(this)?.let {
+                getExpectedTypePredicate(it, context).getRepresentativeTypes().toTypedArray()
+            } ?: arrayOf() // can't infer anything
+        }
     }
 }
 
 private fun JetNamedDeclaration.guessType(context: BindingContext): Array<JetType> {
-    val expectedTypes = SearchUtils.findAllReferences(this, getUseScope())!!.sequence().map { ref ->
+    val expectedTypes = SearchUtils.findAllReferences(this, getUseScope())!!.asSequence().map { ref ->
         if (ref is JetSimpleNameReference) {
             context[BindingContext.EXPECTED_EXPRESSION_TYPE, ref.expression]
         }
@@ -189,15 +191,15 @@ private fun JetNamedDeclaration.guessType(context: BindingContext): Array<JetTyp
     }.filterNotNullTo(HashSet<JetType>())
 
     if (expectedTypes.isEmpty() || expectedTypes.any { expectedType -> ErrorUtils.containsErrorType(expectedType) }) {
-        return array<JetType>()
+        return arrayOf()
     }
     val theType = TypeUtils.intersect(JetTypeChecker.DEFAULT, expectedTypes)
     if (theType != null) {
-        return array<JetType>(theType)
+        return arrayOf(theType)
     }
     else {
         // intersection doesn't exist; let user make an imperfect choice
-        return expectedTypes.copyToArray()
+        return expectedTypes.toTypedArray()
     }
 }
 
@@ -230,4 +232,18 @@ fun JetExpression.getExpressionForTypeGuess() = getAssignmentByLHS()?.getRight()
 
 fun JetCallElement.getTypeInfoForTypeArguments(): List<TypeInfo> {
     return getTypeArguments().map { it.getTypeReference()?.let { TypeInfo(it, Variance.INVARIANT) } }.filterNotNull()
+}
+
+private fun TypePredicate.getRepresentativeTypes(): Set<JetType> {
+    return when (this) {
+        is SingleType -> Collections.singleton(targetType)
+        is AllSubtypes -> Collections.singleton(upperBound)
+        is ForAllTypes -> {
+            if (typeSets.isEmpty()) AllTypes.getRepresentativeTypes()
+            else typeSets.map { it.getRepresentativeTypes() }.reduce { a, b -> a intersect b }
+        }
+        is ForSomeType -> typeSets.flatMapTo(LinkedHashSet<JetType>()) { it.getRepresentativeTypes() }
+        is AllTypes -> emptySet()
+        else -> throw AssertionError("Invalid type predicate: ${this}")
+    }
 }

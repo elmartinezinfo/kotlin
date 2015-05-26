@@ -75,7 +75,7 @@ public class KotlinIntroduceParameterDialog private (
             introduceParameterDescriptor,
             lambdaExtractionDescriptor,
             lambdaExtractionDescriptor.suggestedNames.copyToArray(),
-            listOf(lambdaExtractionDescriptor.controlFlow.outputValueBoxer.returnType),
+            listOf(lambdaExtractionDescriptor.returnType),
             helper
     )
 
@@ -150,7 +150,8 @@ public class KotlinIntroduceParameterDialog private (
         gbConstraints.fill = GridBagConstraints.BOTH
         panel.add(typeField, gbConstraints)
 
-        if (lambdaExtractionDescriptor != null && lambdaExtractionDescriptor.parameters.isNotEmpty()) {
+        if (lambdaExtractionDescriptor != null
+            && (lambdaExtractionDescriptor.parameters.isNotEmpty() || lambdaExtractionDescriptor.receiverParameter != null)) {
             val parameterTablePanel = object : KotlinParameterTablePanel() {
                 override fun onEnterAction() {
                     doOKAction()
@@ -160,7 +161,7 @@ public class KotlinIntroduceParameterDialog private (
                     doCancelAction()
                 }
             }
-            parameterTablePanel.init(lambdaExtractionDescriptor!!.parameters)
+            parameterTablePanel.init(lambdaExtractionDescriptor!!.receiverParameter, lambdaExtractionDescriptor.parameters)
 
             gbConstraints.insets = Insets(4, 4, 4, 8)
             gbConstraints.gridwidth = 1
@@ -273,7 +274,9 @@ public class KotlinIntroduceParameterDialog private (
                                     oldDescriptor,
                                     chosenName,
                                     "",
-                                    parameterTablePanel?.getParameterInfos() ?: listOf()
+                                    parameterTablePanel?.getReceiverInfo(),
+                                    parameterTablePanel?.getParameterInfos() ?: listOf(),
+                                    null
                             )
                             val options = ExtractionGeneratorOptions.DEFAULT.copy(
                                     target = ExtractionTarget.FAKE_LAMBDALIKE_FUNCTION,

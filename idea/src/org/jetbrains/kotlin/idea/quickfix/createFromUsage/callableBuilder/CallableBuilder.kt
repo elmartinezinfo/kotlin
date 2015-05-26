@@ -35,6 +35,8 @@ import com.intellij.psi.codeStyle.JavaCodeStyleManager
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.IncorrectOperationException
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
+import org.jetbrains.kotlin.cfg.pseudocode.Pseudocode
+import org.jetbrains.kotlin.cfg.pseudocode.getContainingPseudocode
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.impl.MutablePackageFragmentDescriptor
@@ -66,7 +68,6 @@ import org.jetbrains.kotlin.utils.addToStdlib.singletonOrEmptyList
 import java.util.*
 import kotlin.properties.Delegates
 
-private val TYPE_PARAMETER_LIST_VARIABLE_NAME = "typeParameterList"
 private val TEMPLATE_FROM_USAGE_FUNCTION_BODY = "New Kotlin Function Body.kt"
 private val TEMPLATE_FROM_USAGE_SECONDARY_CONSTRUCTOR_BODY = "New Kotlin Secondary Constructor Body.kt"
 private val ATTRIBUTE_FUNCTION_NAME = "FUNCTION_NAME"
@@ -91,11 +92,11 @@ class TypeCandidate(val theType: JetType, scope: JetScope? = null) {
     init {
         val typeParametersInType = theType.getTypeParameters()
         if (scope == null) {
-            typeParameters = typeParametersInType.copyToArray()
+            typeParameters = typeParametersInType.toTypedArray()
             renderedType = theType.renderShort(Collections.emptyMap());
         }
         else {
-            typeParameters = getTypeParameterNamesNotInScope(typeParametersInType, scope).copyToArray();
+            typeParameters = getTypeParameterNamesNotInScope(typeParametersInType, scope).toTypedArray();
         }
     }
 
@@ -120,7 +121,7 @@ class CallableBuilderConfiguration(
         val enableSubstitutions: Boolean = true
 )
 
-trait CallablePlacement {
+interface CallablePlacement {
     class WithReceiver(val receiverTypeCandidate: TypeCandidate): CallablePlacement
     class NoReceiver(val containingElement: PsiElement): CallablePlacement
 }
@@ -130,6 +131,8 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
 
     val currentFileContext: BindingContext
     val currentFileModule: ModuleDescriptor
+
+    val pseudocode: Pseudocode? by Delegates.lazy { config.originalElement.getContainingPseudocode(currentFileContext) }
 
     private val typeCandidates = HashMap<TypeInfo, List<TypeCandidate>>()
 
@@ -155,7 +158,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
             val types = typeInfo.getPossibleTypes(this).reverse()
 
             // We have to use semantic equality here
-            [data] class EqWrapper(val _type: JetType) {
+            @data class EqWrapper(val _type: JetType) {
                 override fun equals(other: Any?) = this === other
                                                    || other is EqWrapper && JetTypeChecker.DEFAULT.equalTypes(_type, other._type)
                 override fun hashCode() = 0 // no good way to compute hashCode() that would agree with our equals()
@@ -172,7 +175,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
                 newTypes.removeAll(toRemove)
             }
 
-            if (newTypes.empty) {
+            if (newTypes.isEmpty()) {
                 newTypes.add(EqWrapper(KotlinBuiltIns.getInstance().getAnyType()))
             }
 
@@ -219,8 +222,8 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
             // gather relevant information
 
             val placement = placement
-            when {
-                placement is CallablePlacement.NoReceiver -> {
+            when (placement) {
+                is CallablePlacement.NoReceiver -> {
                     containingElement = placement.containingElement
                     receiverClassDescriptor = with (placement.containingElement) {
                         when (this) {
@@ -230,7 +233,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
                         }
                     }
                 }
-                placement is CallablePlacement.WithReceiver -> {
+                is CallablePlacement.WithReceiver -> {
                     receiverClassDescriptor =
                             placement.receiverTypeCandidate.theType.getConstructor().getDeclarationDescriptor() as? ClassDescriptor
                     val classDeclaration = receiverClassDescriptor?.let { DescriptorToSourceUtils.getSourceFromDescriptor(it) }
@@ -249,7 +252,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
             if (containingElement is JetElement) {
                 jetFileToEdit = containingElement.getContainingJetFile()
                 if (jetFileToEdit != config.currentFile) {
-                    containingFileEditor = FileEditorManager.getInstance(project).getSelectedTextEditor()
+                    containingFileEditor = FileEditorManager.getInstance(project).getSelectedTextEditor()!!
                 }
                 else {
                     containingFileEditor = config.currentEditor!!
@@ -290,8 +293,8 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
                             typeCandidates.first().theType
                         }
                         .subtract(substitutionMap.keySet())
-                fakeFunction = createFakeFunctionDescriptor(scope, typeArgumentsForFakeFunction.size)
-                collectSubstitutionsForCallableTypeParameters(fakeFunction!!, typeArgumentsForFakeFunction, substitutionMap)
+                fakeFunction = createFakeFunctionDescriptor(scope, typeArgumentsForFakeFunction.size())
+                collectSubstitutionsForCallableTypeParameters(fakeFunction, typeArgumentsForFakeFunction, substitutionMap)
                 mandatoryTypeParametersAsCandidates = receiverTypeCandidate.singletonOrEmptyList() + typeArgumentsForFakeFunction.map { TypeCandidate(substitutionMap[it], scope) }
             }
             else {
@@ -368,7 +371,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
             val classTypeParameters = receiverType?.getArguments() ?: Collections.emptyList()
             val ownerTypeArguments = (placement as? CallablePlacement.WithReceiver)?.receiverTypeCandidate?.theType?.getArguments()
                                      ?: Collections.emptyList()
-            assert(ownerTypeArguments.size == classTypeParameters.size)
+            assert(ownerTypeArguments.size() == classTypeParameters.size())
             ownerTypeArguments.zip(classTypeParameters).forEach { result[it.first.getType()] = it.second.getType() }
         }
 
@@ -392,7 +395,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
 
             val validator = CollectingValidator { scope.getClassifier(Name.identifier(it)) == null }
             val parameterNames = JetNameSuggester.suggestNamesForTypeParameters(typeParameterCount, validator)
-            val typeParameters = typeParameterCount.indices.map {
+            val typeParameters = (0..typeParameterCount - 1).map {
                 TypeParameterDescriptorImpl.createWithDefaultBound(
                         fakeFunction,
                         Annotations.EMPTY,
@@ -594,24 +597,26 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
 
             return if (declaration is JetNamedFunction) {
                 val anchor = PsiTreeUtil.skipSiblingsBackward(
-                        classBody!!.getRBrace() ?: classBody!!.getLastChild()!!,
+                        classBody.getRBrace() ?: classBody.getLastChild()!!,
                         javaClass<PsiWhiteSpace>()
                 )
                 classBody.addAfter(declaration, anchor) as JetNamedDeclaration
             }
-            else classBody.addAfter(declaration, classBody!!.getLBrace()!!) as JetNamedDeclaration
+            else classBody.addAfter(declaration, classBody.getLBrace()!!) as JetNamedDeclaration
         }
 
         private fun getTypeParameterRenames(scope: JetScope): Map<TypeParameterDescriptor, String> {
             val allTypeParametersNotInScope = LinkedHashSet<TypeParameterDescriptor>()
 
-            mandatoryTypeParametersAsCandidates.stream()
-                    .plus(callableInfo.parameterInfos.stream().flatMap { typeCandidates[it.typeInfo]!!.stream() })
-                    .flatMap { it.typeParameters.stream() }
+            mandatoryTypeParametersAsCandidates.asSequence()
+                    .plus(callableInfo.parameterInfos.asSequence().flatMap { typeCandidates[it.typeInfo]!!.asSequence() })
+                    .flatMap { it.typeParameters.asSequence() }
                     .toCollection(allTypeParametersNotInScope)
 
             if (!skipReturnType) {
-                computeTypeCandidates(callableInfo.returnTypeInfo).stream().flatMapTo(allTypeParametersNotInScope) { it.typeParameters.stream() }
+                computeTypeCandidates(callableInfo.returnTypeInfo).asSequence().flatMapTo(allTypeParametersNotInScope) {
+                    it.typeParameters.asSequence()
+                }
             }
 
             val validator = CollectingValidator { scope.getClassifier(Name.identifier(it)) == null }
@@ -649,8 +654,8 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
 
             val valueParameters = declaration.getValueParameters()
             val parameterIndicesToShorten = ArrayList<Int>()
-            assert(valueParameters.size == parameterTypeExpressions.size)
-            for ((i, parameter) in valueParameters.stream().withIndices()) {
+            assert(valueParameters.size() == parameterTypeExpressions.size())
+            for ((i, parameter) in valueParameters.asSequence().withIndex()) {
                 val parameterTypeRef = parameter.getTypeReference()
                 if (parameterTypeRef != null) {
                     val parameterType = parameterTypeExpressions[i].typeCandidates.getTypeByRenderedType(
@@ -665,7 +670,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
             }
 
             val expandedValueParameters = declaration.getValueParameters()
-            parameterIndicesToShorten.stream()
+            parameterIndicesToShorten.asSequence()
                     .map { expandedValueParameters[it].getTypeReference() }
                     .filterNotNullTo(typeRefsToShorten)
 
@@ -680,7 +685,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
                 is JetNamedFunction -> TEMPLATE_FROM_USAGE_FUNCTION_BODY
                 else -> throw AssertionError("Unexpected declaration: " + func.getElementTextWithContext())
             }
-            val fileTemplate = FileTemplateManager.getInstance()!!.getCodeTemplate(templateName)
+            val fileTemplate = FileTemplateManager.getInstance(func.getProject())!!.getCodeTemplate(templateName)
             val properties = Properties()
             properties.setProperty(FileTemplate.ATTRIBUTE_RETURN_TYPE, if (skipReturnType) "Unit" else func.getTypeReference()!!.getText())
             receiverClassDescriptor?.let {
@@ -740,7 +745,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
             }
             if (elementToReplace == null) return null
 
-            if (candidates.size == 1) {
+            if (candidates.size() == 1) {
                 builder.replaceElement(elementToReplace, (expression.calculateResult(null) as TextResult).getText())
                 return null
             }
@@ -770,11 +775,11 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
 
             val mandatoryTypeParameters = ArrayList<RenderedTypeParameter>()
             //receiverTypeCandidate?.let { mandatoryTypeParameters.addAll(it.renderedTypeParameters!!) }
-            mandatoryTypeParametersAsCandidates.stream().flatMapTo(mandatoryTypeParameters) { it.renderedTypeParameters!!.stream() }
+            mandatoryTypeParametersAsCandidates.asSequence().flatMapTo(mandatoryTypeParameters) { it.renderedTypeParameters!!.asSequence() }
 
-            callableInfo.parameterInfos.stream().flatMap { typeCandidates[it.typeInfo]!!.stream() }.forEach {
-                typeParameterMap[it.renderedType!!] = it.renderedTypeParameters!!
-            }
+            callableInfo.parameterInfos.asSequence()
+                    .flatMap { typeCandidates[it.typeInfo]!!.asSequence() }
+                    .forEach { typeParameterMap[it.renderedType!!] = it.renderedTypeParameters!! }
 
             if (declaration.getReturnTypeReference() != null) {
                 typeCandidates[callableInfo.returnTypeInfo]!!.forEach {
@@ -792,7 +797,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
         }
 
         private fun setupParameterTypeTemplates(builder: TemplateBuilder, parameterList: List<JetParameter>): List<TypeExpression> {
-            assert(parameterList.size == callableInfo.parameterInfos.size)
+            assert(parameterList.size() == callableInfo.parameterInfos.size())
 
             val typeParameters = ArrayList<TypeExpression>()
             for ((parameter, jetParameter) in callableInfo.parameterInfos.zip(parameterList)) {
@@ -804,7 +809,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
                 val possibleNamesFromExpression = parameter.typeInfo.possibleNamesFromExpression
                 val preferredName = parameter.preferredName
                 val possibleNames = if (preferredName != null) {
-                    array(preferredName, *possibleNamesFromExpression)
+                    arrayOf(preferredName, *possibleNamesFromExpression)
                 }
                 else {
                     possibleNamesFromExpression
@@ -872,7 +877,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
 
             val newJavaMember = convertToJava(targetClass) ?: return false
 
-            val modifierList = newJavaMember.getModifierList()
+            val modifierList = newJavaMember.getModifierList()!!
             if (newJavaMember is PsiMethod || newJavaMember is PsiClass) {
                 modifierList.setModifierProperty(PsiModifier.FINAL, false)
             }
@@ -934,7 +939,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
             when (declaration) {
                 is JetNamedFunction, is JetSecondaryConstructor -> {
                     ((declaration as JetFunction).getBodyExpression() as? JetBlockExpression)?.let {
-                        positionBetween(it.getLBrace(), it.getRBrace())
+                        positionBetween(it.getLBrace()!!, it.getRBrace()!!)
                     }
                 }
                 is JetClassOrObject -> {
@@ -992,7 +997,7 @@ class CallableBuilder(val config: CallableBuilderConfiguration) {
             val variables = templateImpl.getVariables()!!
             if (variables.isNotEmpty()) {
                 val typeParametersVar = if (expression != null) variables.remove(0) else null
-                for (i in 0..(callableInfo.parameterInfos.size - 1)) {
+                for (i in 0..(callableInfo.parameterInfos.size() - 1)) {
                     Collections.swap(variables, i * 2, i * 2 + 1)
                 }
                 typeParametersVar?.let { variables.add(it) }

@@ -28,12 +28,14 @@ import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.idea.JetFileType;
 import org.jetbrains.kotlin.idea.core.refactoring.JetNameSuggester;
 import org.jetbrains.kotlin.idea.core.refactoring.RefactoringPackage;
 import org.jetbrains.kotlin.idea.refactoring.JetRefactoringBundle;
 import org.jetbrains.kotlin.idea.refactoring.introduce.extractionEngine.*;
 import org.jetbrains.kotlin.idea.util.IdeDescriptorRenderers;
+import org.jetbrains.kotlin.types.JetType;
 
 import javax.swing.*;
 import java.awt.*;
@@ -52,6 +54,8 @@ public class KotlinExtractFunctionDialog extends DialogWrapper {
     private JPanel functionNamePanel;
     private NameSuggestionsField functionNameField;
     private JLabel functionNameLabel;
+    private JComboBox returnTypeBox;
+    private JPanel returnTypePanel;
     private KotlinParameterTablePanel parameterTablePanel;
 
     private final Project project;
@@ -120,8 +124,10 @@ public class KotlinExtractFunctionDialog extends DialogWrapper {
     protected void init() {
         super.init();
 
+        ExtractableCodeDescriptor extractableCodeDescriptor = originalDescriptor.getDescriptor();
+
         functionNameField = new NameSuggestionsField(
-                ArrayUtil.toStringArray(originalDescriptor.getDescriptor().getSuggestedNames()),
+                ArrayUtil.toStringArray(extractableCodeDescriptor.getSuggestedNames()),
                 project,
                 JetFileType.INSTANCE
         );
@@ -136,10 +142,44 @@ public class KotlinExtractFunctionDialog extends DialogWrapper {
         functionNamePanel.add(functionNameField, BorderLayout.CENTER);
         functionNameLabel.setLabelFor(functionNameField);
 
+        List<JetType> possibleReturnTypes = ExtractionEnginePackage.getPossibleReturnTypes(extractableCodeDescriptor.getControlFlow());
+        if (possibleReturnTypes.size() > 1) {
+            DefaultComboBoxModel returnTypeBoxModel = new DefaultComboBoxModel(possibleReturnTypes.toArray());
+            returnTypeBox.setModel(returnTypeBoxModel);
+            returnTypeBox.setRenderer(
+                    new DefaultListCellRenderer() {
+                        @NotNull
+                        @Override
+                        public Component getListCellRendererComponent(
+                                JList list,
+                                Object value,
+                                int index,
+                                boolean isSelected,
+                                boolean cellHasFocus
+                        ) {
+                            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                            setText(IdeDescriptorRenderers.SOURCE_CODE_SHORT_NAMES_IN_TYPES.renderType((JetType) value));
+                            return this;
+                        }
+                    }
+            );
+            returnTypeBox.addItemListener(
+                    new ItemListener() {
+                        @Override
+                        public void itemStateChanged(@NotNull ItemEvent e) {
+                            update();
+                        }
+                    }
+            );
+        }
+        else {
+            returnTypePanel.getParent().remove(returnTypePanel);
+        }
+
         boolean enableVisibility = isVisibilitySectionAvailable();
         visibilityBox.setEnabled(enableVisibility);
         if (enableVisibility) {
-            visibilityBox.setSelectedItem(originalDescriptor.getDescriptor().getVisibility());
+            visibilityBox.setSelectedItem(extractableCodeDescriptor.getVisibility());
         }
         visibilityBox.addItemListener(
                 new ItemListener() {
@@ -166,7 +206,7 @@ public class KotlinExtractFunctionDialog extends DialogWrapper {
                 doCancelAction();
             }
         };
-        parameterTablePanel.init(originalDescriptor.getDescriptor().getParameters());
+        parameterTablePanel.init(extractableCodeDescriptor.getReceiverParameter(), extractableCodeDescriptor.getParameters());
 
         inputParametersPanel.setText("&Parameters");
         inputParametersPanel.setLabelFor(parameterTablePanel.getTable());
@@ -213,7 +253,9 @@ public class KotlinExtractFunctionDialog extends DialogWrapper {
         return createNewDescriptor(originalDescriptor.getDescriptor(),
                                    getFunctionName(),
                                    getVisibility(),
-                                   parameterTablePanel.getParameterInfos());
+                                   parameterTablePanel.getReceiverInfo(),
+                                   parameterTablePanel.getParameterInfos(),
+                                   (JetType) returnTypeBox.getSelectedItem());
     }
 
     @NotNull
@@ -225,11 +267,20 @@ public class KotlinExtractFunctionDialog extends DialogWrapper {
             @NotNull ExtractableCodeDescriptor originalDescriptor,
             @NotNull String newName,
             @NotNull String newVisibility,
-            @NotNull List<KotlinParameterTablePanel.ParameterInfo> newParameterInfos
+            @Nullable KotlinParameterTablePanel.ParameterInfo newReceiverInfo,
+            @NotNull List<KotlinParameterTablePanel.ParameterInfo> newParameterInfos,
+            @Nullable JetType returnType
     ) {
         Map<Parameter, Parameter> oldToNewParameters = ContainerUtil.newLinkedHashMap();
         for (KotlinParameterTablePanel.ParameterInfo parameterInfo : newParameterInfos) {
             oldToNewParameters.put(parameterInfo.getOriginalParameter(), parameterInfo.toParameter());
+        }
+        ArrayList<Parameter> newParameters = ContainerUtil.newArrayList(oldToNewParameters.values());
+
+        Parameter originalReceiver = originalDescriptor.getReceiverParameter();
+        Parameter newReceiver = newReceiverInfo != null ? newReceiverInfo.toParameter() : null;
+        if (originalReceiver != null && newReceiver != null) {
+            oldToNewParameters.put(originalReceiver, newReceiver);
         }
 
         ControlFlow controlFlow = originalDescriptor.getControlFlow();
@@ -267,11 +318,12 @@ public class KotlinExtractFunctionDialog extends DialogWrapper {
                 originalDescriptor.getOriginalContext(),
                 Collections.singletonList(newName),
                 newVisibility,
-                ContainerUtil.newArrayList(oldToNewParameters.values()),
-                originalDescriptor.getReceiverParameter(),
+                newParameters,
+                newReceiver,
                 originalDescriptor.getTypeParameters(),
                 replacementMap,
-                controlFlow
+                controlFlow,
+                returnType != null ? returnType : originalDescriptor.getReturnType()
         );
     }
 }

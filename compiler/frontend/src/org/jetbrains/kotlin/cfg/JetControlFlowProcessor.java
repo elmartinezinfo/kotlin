@@ -17,11 +17,13 @@
 package org.jetbrains.kotlin.cfg;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.tree.IElementType;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.SmartFMap;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.containers.MultiMap;
 import kotlin.KotlinPackage;
 import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
@@ -43,7 +45,15 @@ import org.jetbrains.kotlin.resolve.BindingContext;
 import org.jetbrains.kotlin.resolve.BindingContextUtils;
 import org.jetbrains.kotlin.resolve.BindingTrace;
 import org.jetbrains.kotlin.resolve.CompileTimeConstantUtils;
+import org.jetbrains.kotlin.renderer.DescriptorRenderer;
+import org.jetbrains.kotlin.resolve.*;
+import org.jetbrains.kotlin.resolve.bindingContextUtil.BindingContextUtilPackage;
+import org.jetbrains.kotlin.resolve.calls.ValueArgumentsToParametersMapper;
+import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilPackage;
 import org.jetbrains.kotlin.resolve.calls.model.*;
+import org.jetbrains.kotlin.resolve.calls.tasks.ExplicitReceiverKind;
+import org.jetbrains.kotlin.resolve.calls.tasks.ResolutionCandidate;
+import org.jetbrains.kotlin.resolve.calls.tasks.TracingStrategy;
 import org.jetbrains.kotlin.resolve.constants.CompileTimeConstant;
 import org.jetbrains.kotlin.resolve.constants.evaluate.ConstantExpressionEvaluator;
 import org.jetbrains.kotlin.resolve.scopes.receivers.ExpressionReceiver;
@@ -136,7 +146,7 @@ public class JetControlFlowProcessor {
                 if (!generateCall(condition.getOperationReference())) {
                     JetExpression rangeExpression = condition.getRangeExpression();
                     generateInstructions(rangeExpression);
-                    createNonSyntheticValue(condition, MagicKind.UNRESOLVED_CALL, rangeExpression);
+                    createUnresolvedCall(condition, rangeExpression);
                 }
             }
 
@@ -217,6 +227,107 @@ public class JetControlFlowProcessor {
         @NotNull
         private PseudoValue createNonSyntheticValue(@NotNull JetElement to, @NotNull MagicKind kind, JetElement... from) {
             return createNonSyntheticValue(to, Arrays.asList(from), kind);
+        }
+
+        @Nullable
+        private Map<PseudoValue, TypePredicate> getTypeMapForUnresolvedCall(@NotNull JetElement to, List<PseudoValue> arguments) {
+            Call call = CallUtilPackage.getCall(to, trace.getBindingContext());
+            if (call == null) return null;
+
+            JetExpression callee = call.getCalleeExpression();
+            if (callee == null) return null;
+
+            Collection<FunctionDescriptor> candidates = KotlinPackage.sortBy(
+                    KotlinPackage.filterIsInstance(
+                            BindingContextUtilPackage.getReferenceTargets(callee, trace.getBindingContext()),
+                            FunctionDescriptor.class
+                    ),
+                    new Function1<FunctionDescriptor, Comparable>() {
+                        @Override
+                        public Comparable invoke(FunctionDescriptor descriptor) {
+                            return DescriptorRenderer.DEBUG_TEXT.render(descriptor);
+                        }
+                    }
+            );
+            if (candidates.isEmpty()) return null;
+
+            ReceiverValue explicitReceiver = call.getExplicitReceiver();
+            int argValueOffset = explicitReceiver.exists() ? 1 : 0;
+
+            MultiMap<PseudoValue, TypePredicate> valuesToPredicates = new MultiMap<PseudoValue, TypePredicate>(arguments.size(), 1);
+
+            candidateLoop:
+            for (FunctionDescriptor candidate : candidates) {
+                ResolvedCallImpl<FunctionDescriptor> candidateCall = ResolvedCallImpl.create(
+                        ResolutionCandidate.create(call,
+                                                   candidate,
+                                                   call.getDispatchReceiver(),
+                                                   explicitReceiver,
+                                                   ExplicitReceiverKind.NO_EXPLICIT_RECEIVER,
+                                                   null),
+                        new DelegatingBindingTrace(trace.getBindingContext(), "Compute type predicates for unresolved call arguments"),
+                        TracingStrategy.EMPTY,
+                        new DataFlowInfoForArgumentsImpl(call)
+                );
+                ValueArgumentsToParametersMapper.Status status = ValueArgumentsToParametersMapper.mapValueArgumentsToParameters(
+                        call,
+                        TracingStrategy.EMPTY,
+                        candidateCall,
+                        Sets.<ValueArgument>newLinkedHashSet()
+                );
+                if (!status.isSuccess()) continue;
+
+                Map<ValueParameterDescriptor, ResolvedValueArgument> candidateArgumentMap = candidateCall.getValueArguments();
+                List<? extends ValueArgument> callArguments = call.getValueArguments();
+                for (int i = 0; i < callArguments.size(); i++) {
+                    int valueIndex = i + argValueOffset;
+                    if (valueIndex >= arguments.size()) continue candidateLoop;
+                    PseudoValue argumentValue = arguments.get(valueIndex);
+
+                    ArgumentMapping mapping = candidateCall.getArgumentMapping(callArguments.get(i));
+                    if (!(mapping instanceof ArgumentMatch)) continue candidateLoop;
+
+                    ValueParameterDescriptor candidateParameter = ((ArgumentMatch) mapping).getValueParameter();
+                    ResolvedValueArgument resolvedArgument = candidateArgumentMap.get(candidateParameter);
+                    JetType expectedType = resolvedArgument instanceof VarargValueArgument
+                                   ? candidateParameter.getVarargElementType()
+                                   : candidateParameter.getType();
+
+                    valuesToPredicates.putValue(argumentValue, expectedType != null ? new AllSubtypes(expectedType) : AllTypes.INSTANCE$);
+                }
+            }
+
+            SmartFMap<PseudoValue, TypePredicate> result = SmartFMap.emptyMap();
+            for (Map.Entry<PseudoValue, Collection<TypePredicate>> entry : valuesToPredicates.entrySet()) {
+                result = result.plus(entry.getKey(), PseudocodePackage.or(entry.getValue()));
+            }
+
+            return result;
+        }
+
+        @NotNull
+        private PseudoValue createUnresolvedCallByValues(@NotNull JetElement to, @Nullable JetElement valueElement, List<PseudoValue> arguments) {
+            Map<PseudoValue, TypePredicate> typeMap = getTypeMapForUnresolvedCall(to, arguments);
+            if (typeMap == null) {
+                typeMap = defaultTypeMap(arguments);
+            }
+            
+            return builder.magic(to, valueElement, arguments, typeMap, MagicKind.UNRESOLVED_CALL).getOutputValue();
+        }
+
+        @NotNull
+        private PseudoValue createUnresolvedCallByValues(@NotNull JetElement to, List<PseudoValue> arguments) {
+            return createUnresolvedCallByValues(to, to, arguments);
+        }
+
+        @NotNull
+        private PseudoValue createUnresolvedCall(@NotNull JetElement to, List<? extends JetElement> from) {
+            return createUnresolvedCallByValues(to, elementsToValues(from));
+        }
+
+        @NotNull
+        private PseudoValue createUnresolvedCall(@NotNull JetElement to, JetElement... from) {
+            return createUnresolvedCall(to, Arrays.asList(from));
         }
 
         @NotNull
@@ -305,7 +416,7 @@ public class JetControlFlowProcessor {
         public void visitThisExpression(@NotNull JetThisExpression expression) {
             ResolvedCall<?> resolvedCall = getResolvedCall(expression, trace.getBindingContext());
             if (resolvedCall == null) {
-                createNonSyntheticValue(expression, MagicKind.UNRESOLVED_CALL);
+                createUnresolvedCall(expression);
                 return;
             }
 
@@ -331,7 +442,7 @@ public class JetControlFlowProcessor {
                 generateCall(variableAsFunctionResolvedCall.getVariableCall());
             }
             else if (!generateCall(expression) && !(expression.getParent() instanceof JetCallExpression)) {
-                createNonSyntheticValue(expression, MagicKind.UNRESOLVED_CALL, generateAndGetReceiverIfAny(expression));
+                createUnresolvedCall(expression, generateAndGetReceiverIfAny(expression));
             }
         }
 
@@ -444,7 +555,7 @@ public class JetControlFlowProcessor {
                 generateInstructions(right);
             }
             mark(expression);
-            createNonSyntheticValue(expression, MagicKind.UNRESOLVED_CALL, left, right);
+            createUnresolvedCall(expression, left, right);
         }
 
         private void visitAssignment(
@@ -492,7 +603,7 @@ public class JetControlFlowProcessor {
                 List<PseudoValue> arguments = KotlinPackage.filterNotNull(
                         Arrays.asList(getBoundOrUnreachableValue(lhs), rhsDeferredValue.invoke())
                 );
-                builder.magic(parentExpression, parentExpression, arguments, defaultTypeMap(arguments), MagicKind.UNRESOLVED_CALL);
+                createUnresolvedCallByValues(parentExpression, arguments);
 
                 return;
             }
@@ -505,8 +616,7 @@ public class JetControlFlowProcessor {
             generateInstructions(lhs.getArrayExpression());
 
             Map<PseudoValue, ReceiverValue> receiverValues = getReceiverValues(setResolvedCall);
-            SmartFMap<PseudoValue, ValueParameterDescriptor> argumentValues =
-                    getArraySetterArguments(rhsDeferredValue, setResolvedCall);
+            SmartFMap<PseudoValue, ValueParameterDescriptor> argumentValues = getArraySetterArguments(rhsDeferredValue, setResolvedCall);
 
             builder.call(parentExpression, setResolvedCall, receiverValues, argumentValues);
         }
@@ -582,7 +692,7 @@ public class JetControlFlowProcessor {
         }
 
         private void generateArrayAccessWithoutCall(JetArrayAccessExpression arrayAccessExpression) {
-            createNonSyntheticValue(arrayAccessExpression, generateArrayAccessArguments(arrayAccessExpression), MagicKind.UNRESOLVED_CALL);
+            createUnresolvedCall(arrayAccessExpression, generateArrayAccessArguments(arrayAccessExpression));
         }
 
         private List<JetExpression> generateArrayAccessArguments(JetArrayAccessExpression arrayAccessExpression) {
@@ -621,7 +731,7 @@ public class JetControlFlowProcessor {
             }
             else {
                 generateInstructions(baseExpression);
-                rhsValue = createNonSyntheticValue(expression, MagicKind.UNRESOLVED_CALL, baseExpression);
+                rhsValue = createUnresolvedCall(expression, baseExpression);
             }
 
             if (incrementOrDecrement) {
@@ -1152,7 +1262,7 @@ public class JetControlFlowProcessor {
                 inputExpressions.add(generateAndGetReceiverIfAny(expression));
 
                 mark(expression);
-                createNonSyntheticValue(expression, inputExpressions, MagicKind.UNRESOLVED_CALL);
+                createUnresolvedCall(expression, inputExpressions);
             }
         }
 
@@ -1246,7 +1356,8 @@ public class JetControlFlowProcessor {
                     ).getOutputValue();
                 }
                 else {
-                    writtenValue = createSyntheticValue(entry, MagicKind.UNRESOLVED_CALL, initializer);
+                    List<PseudoValue> arguments = ContainerUtil.createMaybeSingletonList(getBoundOrUnreachableValue(initializer));
+                    writtenValue = createUnresolvedCallByValues(entry, null, arguments);
                 }
 
                 if (generateWriteForEntries) {
@@ -1492,7 +1603,7 @@ public class JetControlFlowProcessor {
                 for (JetExpression argument : arguments) {
                     generateInstructions(argument);
                 }
-                createNonSyntheticValue(call, arguments, MagicKind.UNRESOLVED_CALL);
+                createUnresolvedCall(call, arguments);
             }
         }
 
@@ -1552,13 +1663,8 @@ public class JetControlFlowProcessor {
         private InstructionWithValue generateCall(@NotNull ResolvedCall<?> resolvedCall) {
             JetElement callElement = resolvedCall.getCall().getCallElement();
 
-            if (resolvedCall instanceof VariableAsFunctionResolvedCall) {
-                VariableAsFunctionResolvedCall variableAsFunctionResolvedCall = (VariableAsFunctionResolvedCall) resolvedCall;
-                return generateCall(variableAsFunctionResolvedCall.getFunctionCall());
-            }
-
-            CallableDescriptor resultingDescriptor = resolvedCall.getResultingDescriptor();
             Map<PseudoValue, ReceiverValue> receivers = getReceiverValues(resolvedCall);
+
             SmartFMap<PseudoValue, ValueParameterDescriptor> parameterValues = SmartFMap.emptyMap();
             for (ValueArgument argument : resolvedCall.getCall().getValueArguments()) {
                 ArgumentMapping argumentMapping = resolvedCall.getArgumentMapping(argument);
@@ -1572,7 +1678,7 @@ public class JetControlFlowProcessor {
                 }
             }
 
-            if (resultingDescriptor instanceof VariableDescriptor) {
+            if (resolvedCall.getResultingDescriptor() instanceof VariableDescriptor) {
                 // If a callee of the call is just a variable (without 'invoke'), 'read variable' is generated.
                 // todo : process arguments for such a case (KT-5387)
                 JetExpression callExpression = callElement instanceof JetExpression ? (JetExpression) callElement : null;
@@ -1582,13 +1688,35 @@ public class JetControlFlowProcessor {
                         : "Variable-based call with non-empty argument list: " + callElement.getText();
                 return builder.readVariable(callExpression, resolvedCall, receivers);
             }
+
             mark(resolvedCall.getCall().getCallElement());
             return builder.call(callElement, resolvedCall, receivers, parameterValues);
         }
 
         @NotNull
         private Map<PseudoValue, ReceiverValue> getReceiverValues(ResolvedCall<?> resolvedCall) {
+            PseudoValue varCallResult = null;
+            ReceiverValue explicitReceiver = ReceiverValue.NO_RECEIVER;
+            if (resolvedCall instanceof VariableAsFunctionResolvedCall) {
+                varCallResult = generateCall(((VariableAsFunctionResolvedCall) resolvedCall).getVariableCall()).getOutputValue();
+
+                ExplicitReceiverKind kind = resolvedCall.getExplicitReceiverKind();
+                //noinspection EnumSwitchStatementWhichMissesCases
+                switch (kind) {
+                    case DISPATCH_RECEIVER:
+                        explicitReceiver = resolvedCall.getDispatchReceiver();
+                        break;
+                    case EXTENSION_RECEIVER:
+                    case BOTH_RECEIVERS:
+                        explicitReceiver = resolvedCall.getExtensionReceiver();
+                        break;
+                }
+            }
+
             SmartFMap<PseudoValue, ReceiverValue> receiverValues = SmartFMap.emptyMap();
+            if (explicitReceiver.exists() && varCallResult != null) {
+                receiverValues = receiverValues.plus(varCallResult, explicitReceiver);
+            }
             JetElement callElement = resolvedCall.getCall().getCallElement();
             receiverValues = getReceiverValues(callElement, resolvedCall.getDispatchReceiver(), receiverValues);
             receiverValues = getReceiverValues(callElement, resolvedCall.getExtensionReceiver(), receiverValues);
@@ -1601,7 +1729,7 @@ public class JetControlFlowProcessor {
                 ReceiverValue receiver,
                 SmartFMap<PseudoValue, ReceiverValue> receiverValues
         ) {
-            if (!receiver.exists()) return receiverValues;
+            if (!receiver.exists() || receiverValues.containsValue(receiver)) return receiverValues;
 
             if (receiver instanceof ThisReceiver) {
                 receiverValues = receiverValues.plus(createSyntheticValue(callElement, MagicKind.IMPLICIT_RECEIVER), receiver);

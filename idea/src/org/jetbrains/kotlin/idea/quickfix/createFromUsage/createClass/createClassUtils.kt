@@ -91,11 +91,11 @@ private fun JetExpression.getInheritableTypeInfo(
         context: BindingContext,
         moduleDescriptor: ModuleDescriptor,
         containingDeclaration: PsiElement): Pair<TypeInfo, (ClassKind) -> Boolean> {
-    val types = guessTypes(context, moduleDescriptor, false)
-    if (types.size != 1) return TypeInfo.Empty to { classKind -> true }
+    val types = guessTypes(context, moduleDescriptor, coerceUnusedToUnit = false)
+    if (types.size() != 1) return TypeInfo.Empty to { classKind -> true }
 
     val type = types.first()
-    val descriptor = type.getConstructor().getDeclarationDescriptor()
+    val descriptor = type.getConstructor().getDeclarationDescriptor() ?: return TypeInfo.Empty to { classKind -> false }
 
     val canHaveSubtypes = TypeUtils.canHaveSubtypes(JetTypeChecker.DEFAULT, type)
     val isEnum = DescriptorUtils.isEnumClass(descriptor)

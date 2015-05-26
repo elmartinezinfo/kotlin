@@ -36,6 +36,9 @@
     <component>
       <implementation-class>org.jetbrains.kotlin.idea.configuration.ui.AbsentJdkAnnotationsComponent</implementation-class>
     </component>
+      <component>
+          <implementation-class>org.jetbrains.kotlin.idea.js.KotlinJavaScriptLibraryManager</implementation-class>
+      </component>
   </project-components>
 
  <application-components>
@@ -46,6 +49,12 @@
    <component>
      <implementation-class>org.jetbrains.kotlin.idea.versions.KotlinUpdatePluginComponent</implementation-class>
    </component>
+
+   <component>
+       <interface-class>org.jetbrains.kotlin.idea.js.KotlinJavaScriptMetaFileSystem</interface-class>
+       <implementation-class>org.jetbrains.kotlin.idea.js.KotlinJavaScriptMetaFileSystem</implementation-class>
+   </component>
+
  </application-components>
 
   <module-components>
@@ -163,8 +172,11 @@
     <projectService serviceInterface="org.jetbrains.kotlin.idea.caches.resolve.KotlinCacheService"
                     serviceImplementation="org.jetbrains.kotlin.idea.caches.resolve.KotlinCacheService"/>
 
-    <projectService serviceInterface="org.jetbrains.kotlin.load.kotlin.VirtualFileFinderFactory"
-                    serviceImplementation="org.jetbrains.kotlin.idea.vfilefinder.IDEVirtualFileFinderFactory"/>
+    <projectService serviceInterface="org.jetbrains.kotlin.load.kotlin.JvmVirtualFileFinderFactory"
+                    serviceImplementation="org.jetbrains.kotlin.idea.vfilefinder.JvmIDEVirtualFileFinderFactory"/>
+
+    <projectService serviceInterface="org.jetbrains.kotlin.idea.vfilefinder.JsVirtualFileFinderFactory"
+                    serviceImplementation="org.jetbrains.kotlin.idea.vfilefinder.JsIDEVirtualFileFinderFactory"/>
 
     <projectService serviceInterface="org.jetbrains.kotlin.asJava.LightClassGenerationSupport"
                     serviceImplementation="org.jetbrains.kotlin.idea.caches.resolve.IDELightClassGenerationSupport"/>
@@ -222,6 +234,7 @@
     <lang.importOptimizer language="jet" implementationClass="org.jetbrains.kotlin.idea.imports.KotlinImportOptimizer"/>
 
     <fileTypeFactory implementation="org.jetbrains.kotlin.idea.JetFileFactory"/>
+    <fileTypeFactory implementation="org.jetbrains.kotlin.idea.KotlinJavaScriptMetaFileTypeFactory"/>
 
     <compileServer.plugin classpath="jps/kotlin-jps-plugin.jar;kotlin-runtime.jar;kotlin-reflect.jar;kotlin-plugin.jar"/>
     <compiler.task execute="BEFORE" implementation="org.jetbrains.kotlin.idea.internal.makeBackup.MakeBackupCompileTask"/>
@@ -422,7 +435,7 @@
 
     <library.presentationProvider implementation="org.jetbrains.kotlin.idea.framework.JavaRuntimePresentationProvider"/>
     <library.presentationProvider implementation="org.jetbrains.kotlin.idea.framework.JSLibraryStdPresentationProvider"/>
-    <library.presentationProvider implementation="org.jetbrains.kotlin.idea.framework.JsHeaderLibraryPresentationProvider"/>
+    <library.presentationProvider implementation="org.jetbrains.kotlin.idea.framework.KotlinJavaScriptLibraryPresentationProvider"/>
 
     <typeHierarchyProvider language="jet" implementationClass="org.jetbrains.kotlin.idea.hierarchy.KotlinTypeHierarchyProvider"/>
     <callHierarchyProvider
@@ -457,10 +470,11 @@
     <stubIndex implementation="org.jetbrains.kotlin.idea.stubindex.JetProbablyNothingPropertyShortNameIndex"/>
 
     <psi.classFileDecompiler implementation="org.jetbrains.kotlin.idea.decompiler.JetClassFileDecompiler"/>
-    <psi.classFileDecompiler implementation="org.jetbrains.kotlin.idea.decompiler.KotlinJavascriptMetaFileDecompiler"/>
+    <psi.classFileDecompiler implementation="org.jetbrains.kotlin.idea.decompiler.KotlinJavaScriptMetaFileDecompiler"/>
     
     <fileBasedIndex implementation="org.jetbrains.kotlin.idea.versions.KotlinAbiVersionIndex"/>
     <fileBasedIndex implementation="org.jetbrains.kotlin.idea.vfilefinder.KotlinClassFileIndex"/>
+    <fileBasedIndex implementation="org.jetbrains.kotlin.idea.vfilefinder.KotlinJavaScriptMetaFileIndex"/>
 
     <idIndexer filetype="Kotlin" implementationClass="org.jetbrains.kotlin.idea.search.KotlinIdIndexer"/>
     <todoIndexer filetype="Kotlin" implementationClass="org.jetbrains.kotlin.idea.search.KotlinTodoIndexer"/>
@@ -995,6 +1009,13 @@
 
     <project.converterProvider implementation="org.jetbrains.kotlin.idea.converters.JetRunConfigurationSettingsFormatConverterProvider"/>
 
+    <fileType.fileViewProviderFactory filetype="KJSM" implementationClass="com.intellij.psi.ClassFileViewProviderFactory"/>
+
+    <filetype.stubBuilder filetype="KJSM" implementationClass="com.intellij.psi.impl.compiled.ClassFileStubBuilder"/>
+
+    <filetype.decompiler filetype="KJSM" implementationClass="com.intellij.psi.impl.compiled.ClassFileDecompiler"/>
+
+    <treeStructureProvider implementation="org.jetbrains.kotlin.idea.js.KotlinJavaScriptLibraryContentsTreeStructureProvider"/>
   </extensions>
 
   <xi:include href="extensions/ide.xml" xpointer="xpointer(/idea-plugin/*)"/>

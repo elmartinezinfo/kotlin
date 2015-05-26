@@ -117,7 +117,7 @@ public class KotlinRecursiveCallLineMarkerProvider() : LineMarkerProvider {
     }
 
     private fun isRecursiveCall(element: JetElement): Boolean {
-        val resolveName = if (element !is JetArrayAccessExpression) {
+        val resolveName = (if (element !is JetArrayAccessExpression) {
             val elementParent = element.getParent()
             when (elementParent) {
                 is JetCallExpression, is JetBinaryExpression,
@@ -133,9 +133,7 @@ public class KotlinRecursiveCallLineMarkerProvider() : LineMarkerProvider {
         }
         else {
             "get"
-        }
-
-        if (resolveName == null) return false
+        }) ?: return false
 
         val enclosingFunction = getEnclosingFunction(element, false) ?: return false
 

@@ -17,7 +17,7 @@
 package org.jetbrains.kotlin.diagnostics.rendering;
 
 import com.intellij.openapi.extensions.ExtensionPointName;
-import kotlin.jvm.functions.Function1;
+import kotlin.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
@@ -465,6 +465,7 @@ public class DefaultErrorMessages {
 
         MAP.put(REDUNDANT_PROJECTION, "Projection is redundant: the corresponding type parameter of {0} has the same variance", NAME);
         MAP.put(CONFLICTING_PROJECTION, "Projection is conflicting with variance of the corresponding type parameter of {0}. Remove the projection or replace it with ''*''", NAME);
+        MAP.put(UNSUPPORTED_STAR_PROJECTION, "The type parameter of {0} uses unsupported star projection variance", NAME);
 
         MAP.put(TYPE_MISMATCH_IN_FOR_LOOP, "The loop iterates over values of type {0} but the parameter is declared to be {1}", RENDER_TYPE,
                 RENDER_TYPE);

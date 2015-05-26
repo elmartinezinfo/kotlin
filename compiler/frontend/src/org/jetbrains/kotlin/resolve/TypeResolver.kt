@@ -282,8 +282,14 @@ public class TypeResolver(
                 }
             }
             else {
-                // TODO : handle the Foo<in *> case
-                val type = resolveType(c.noBareTypes(), argumentElement.getTypeReference())
+                fun unsupportedStarProjection(): TypeProjection {
+                    c.trace.report(UNSUPPORTED_STAR_PROJECTION.on(argumentElement, constructor.getDeclarationDescriptor()))
+                    return TypeProjectionImpl(when (projectionKind) {
+                        JetProjectionKind.IN -> IN_VARIANCE
+                        else -> OUT_VARIANCE
+                    }, ErrorUtils.createErrorType("*"))
+                }
+                val type = argumentElement.getTypeReference()?.let { resolveType(c.noBareTypes(), it) } ?: return@map unsupportedStarProjection()
                 val kind = resolveProjectionKind(projectionKind)
                 if (constructor.getParameters().size() > i) {
                     val parameterDescriptor = constructor.getParameters()[i]

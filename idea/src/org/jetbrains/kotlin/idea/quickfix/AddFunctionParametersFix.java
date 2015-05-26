@@ -23,7 +23,8 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiReference;
 import com.intellij.psi.search.searches.ReferencesSearch;
 import com.intellij.psi.util.PsiTreeUtil;
-import kotlin.ExtensionFunction0;
+import kotlin.jvm.functions.*;
+import kotlin.*;
 import kotlin.Unit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.descriptors.ConstructorDescriptor;
@@ -125,7 +126,7 @@ public class AddFunctionParametersFix extends ChangeFunctionSignatureFix {
             public JetMethodDescriptor configure(@NotNull final JetMethodDescriptor originalDescriptor, @NotNull final BindingContext bindingContext) {
                 return ChangeSignaturePackage.modify(
                         originalDescriptor,
-                        new ExtensionFunction0<JetMutableMethodDescriptor, Unit>() {
+                        new Function1<JetMutableMethodDescriptor, Unit>() {
                             @Override
                             public Unit invoke(JetMutableMethodDescriptor descriptor) {
                                 List<ValueParameterDescriptor> parameters = functionDescriptor.getValueParameters();

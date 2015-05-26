@@ -18,7 +18,7 @@ package org.jetbrains.kotlin.generators.builtins.generateBuiltIns
 
 import org.jetbrains.kotlin.generators.builtins.arrayIterators.GenerateArrayIterators
 import org.jetbrains.kotlin.generators.builtins.arrays.GenerateArrays
-import org.jetbrains.kotlin.generators.builtins.functions.FunctionKind
+import org.jetbrains.kotlin.generators.builtins.functionImpl.GenerateFunctionImpl
 import org.jetbrains.kotlin.generators.builtins.functions.GenerateFunctions
 import org.jetbrains.kotlin.generators.builtins.iterators.GenerateIterators
 import org.jetbrains.kotlin.generators.builtins.progressionIterators.GenerateProgressionIterators
@@ -31,14 +31,21 @@ import java.io.PrintWriter
 fun assertExists(file: File): Unit =
         if (!file.exists()) error("Output dir does not exist: ${file.getAbsolutePath()}")
 
-val BUILT_INS_NATIVE_DIR = File("core/builtins/native/kotlin/")
-val BUILT_INS_SRC_DIR = File("core/builtins/src/kotlin/")
-val RUNTIME_JVM_DIR = File("core/runtime.jvm/src/kotlin/")
+val BUILT_INS_NATIVE_DIR = File("core/builtins/native/")
+val BUILT_INS_SRC_DIR = File("core/builtins/src/")
+val RUNTIME_JVM_DIR = File("core/runtime.jvm/src/")
 
 abstract class BuiltInsSourceGenerator(val out: PrintWriter) {
     protected abstract fun generateBody(): Unit
 
     protected open fun getPackage(): String = "kotlin"
+
+    protected open val language: Language = Language.KOTLIN
+
+    enum class Language {
+        KOTLIN
+        JAVA
+    }
 
     final fun generate() {
         out.println(File("license/LICENSE.txt").readText())
@@ -46,7 +53,8 @@ abstract class BuiltInsSourceGenerator(val out: PrintWriter) {
         // and we don't want to scare users with any internal information about our project
         out.println("// Auto-generated file. DO NOT EDIT!")
         out.println()
-        out.println("package ${getPackage()}")
+        out.print("package ${getPackage()}")
+        if (language == Language.KOTLIN) out.println() else out.println(";")
         out.println()
 
         generateBody()
@@ -58,17 +66,15 @@ fun generateBuiltIns(generate: (File, (PrintWriter) -> BuiltInsSourceGenerator) 
     assertExists(BUILT_INS_SRC_DIR)
     assertExists(RUNTIME_JVM_DIR)
 
-    for (kind in FunctionKind.values()) {
-        generate(File(BUILT_INS_SRC_DIR, kind.getFileName())) { GenerateFunctions(it, kind) }
-    }
-
-    generate(File(BUILT_INS_NATIVE_DIR, "Arrays.kt")) { GenerateArrays(it) }
-    generate(File(BUILT_INS_NATIVE_DIR, "Primitives.kt")) { GeneratePrimitives(it) }
-    generate(File(BUILT_INS_SRC_DIR, "Iterators.kt")) { GenerateIterators(it) }
-    generate(File(RUNTIME_JVM_DIR, "jvm/internal/ArrayIterators.kt")) { GenerateArrayIterators(it) }
-    generate(File(BUILT_INS_SRC_DIR, "ProgressionIterators.kt")) { GenerateProgressionIterators(it) }
-    generate(File(BUILT_INS_SRC_DIR, "Progressions.kt")) { GenerateProgressions(it) }
-    generate(File(BUILT_INS_SRC_DIR, "Ranges.kt")) { GenerateRanges(it) }
+    generate(File(RUNTIME_JVM_DIR, "kotlin/jvm/functions/Functions.kt")) { GenerateFunctions(it) }
+    generate(File(RUNTIME_JVM_DIR, "kotlin/jvm/internal/FunctionImpl.java")) { GenerateFunctionImpl(it) }
+    generate(File(BUILT_INS_NATIVE_DIR, "kotlin/Arrays.kt")) { GenerateArrays(it) }
+    generate(File(BUILT_INS_NATIVE_DIR, "kotlin/Primitives.kt")) { GeneratePrimitives(it) }
+    generate(File(BUILT_INS_SRC_DIR, "kotlin/Iterators.kt")) { GenerateIterators(it) }
+    generate(File(RUNTIME_JVM_DIR, "kotlin/jvm/internal/ArrayIterators.kt")) { GenerateArrayIterators(it) }
+    generate(File(BUILT_INS_SRC_DIR, "kotlin/ProgressionIterators.kt")) { GenerateProgressionIterators(it) }
+    generate(File(BUILT_INS_SRC_DIR, "kotlin/Progressions.kt")) { GenerateProgressions(it) }
+    generate(File(BUILT_INS_SRC_DIR, "kotlin/Ranges.kt")) { GenerateRanges(it) }
 }
 
 fun main(args: Array<String>) {

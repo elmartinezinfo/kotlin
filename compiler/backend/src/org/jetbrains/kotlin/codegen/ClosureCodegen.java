@@ -18,7 +18,8 @@ package org.jetbrains.kotlin.codegen;
 
 import com.google.common.collect.Lists;
 import com.intellij.util.ArrayUtil;
-import kotlin.Function1;
+import kotlin.jvm.functions.*;
+import kotlin.*;
 import kotlin.Unit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,6 +35,7 @@ import org.jetbrains.kotlin.load.java.JvmAbi;
 import org.jetbrains.kotlin.psi.JetElement;
 import org.jetbrains.kotlin.resolve.BindingContext;
 import org.jetbrains.kotlin.resolve.DescriptorUtils;
+import org.jetbrains.kotlin.resolve.jvm.AsmTypes;
 import org.jetbrains.kotlin.types.JetType;
 import org.jetbrains.kotlin.types.expressions.OperatorConventions;
 import org.jetbrains.org.objectweb.asm.MethodVisitor;
@@ -51,6 +53,7 @@ import static org.jetbrains.kotlin.codegen.binding.CodegenBinding.CLOSURE;
 import static org.jetbrains.kotlin.codegen.binding.CodegenBinding.asmTypeForAnonymousClass;
 import static org.jetbrains.kotlin.load.java.JvmAnnotationNames.KotlinSyntheticClass;
 import static org.jetbrains.kotlin.resolve.descriptorUtil.DescriptorUtilPackage.getBuiltIns;
+import static org.jetbrains.kotlin.resolve.jvm.AsmTypes.*;
 import static org.jetbrains.kotlin.resolve.jvm.diagnostics.DiagnosticsPackage.OtherOrigin;
 import static org.jetbrains.org.objectweb.asm.Opcodes.*;
 
@@ -213,7 +216,10 @@ public class ClosureCodegen extends MemberCodegen<JetElement> {
     }
 
     @NotNull
-    public StackValue putInstanceOnStack(@NotNull final ExpressionCodegen codegen) {
+    public StackValue putInstanceOnStack(
+            @NotNull final ExpressionCodegen codegen,
+            @Nullable final FunctionDescriptor functionReferenceTarget
+    ) {
         return StackValue.operation(asmType, new Function1<InstructionAdapter, Unit>() {
             @Override
             public Unit invoke(InstructionAdapter v) {
@@ -227,9 +233,35 @@ public class ClosureCodegen extends MemberCodegen<JetElement> {
                     codegen.pushClosureOnStack(classDescriptor, true, codegen.defaultCallGenerator);
                     v.invokespecial(asmType.getInternalName(), "<init>", constructor.getDescriptor(), false);
                 }
+
+                if (functionReferenceTarget != null) {
+                    equipFunctionReferenceWithReflection(v, functionReferenceTarget);
+                }
+
                 return Unit.INSTANCE$;
             }
         });
+    }
+
+    private static void equipFunctionReferenceWithReflection(@NotNull InstructionAdapter v, @NotNull FunctionDescriptor target) {
+        DeclarationDescriptor container = target.getContainingDeclaration();
+
+        Type type;
+        if (container instanceof PackageFragmentDescriptor) {
+            type = target.getExtensionReceiverParameter() != null
+                   ? K_TOP_LEVEL_EXTENSION_FUNCTION
+                   : K_TOP_LEVEL_FUNCTION;
+        }
+        else if (container instanceof ClassDescriptor) {
+            type = K_MEMBER_FUNCTION;
+        }
+        else {
+            type = K_LOCAL_FUNCTION;
+        }
+
+        Method method = method("function", K_FUNCTION, FUNCTION_REFERENCE);
+        v.invokestatic(REFLECTION, method.getName(), method.getDescriptor(), false);
+        StackValue.coerce(K_FUNCTION, type, v);
     }
 
 
@@ -305,7 +337,14 @@ public class ClosureCodegen extends MemberCodegen<JetElement> {
             }
 
             iv.load(0, superClassAsmType);
-            iv.invokespecial(superClassAsmType.getInternalName(), "<init>", "()V", false);
+
+            if (superClassAsmType.equals(AsmTypes.LAMBDA)) {
+                iv.iconst(funDescriptor.getValueParameters().size());
+                iv.invokespecial(superClassAsmType.getInternalName(), "<init>", "(I)V", false);
+            }
+            else {
+                iv.invokespecial(superClassAsmType.getInternalName(), "<init>", "()V", false);
+            }
 
             iv.visitInsn(RETURN);
 

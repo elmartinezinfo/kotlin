@@ -17,8 +17,8 @@
 package org.jetbrains.kotlin.checkers;
 
 import com.intellij.openapi.Disposable;
+import com.intellij.util.SmartList;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.kotlin.builtins.KotlinBuiltIns;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.config.CompilerConfiguration;
@@ -78,20 +78,11 @@ public abstract class AbstractJetDiagnosticsTestWithJsStdLib extends AbstractJet
 
     @NotNull
     @Override
-    protected ModuleDescriptorImpl createSealedModule(@NotNull StorageManager storageManager) {
-        ModuleDescriptorImpl module = createModule("<kotlin-js-test-module>", storageManager);
-
-        module.addDependencyOnModule(module);
-
-        for(ModuleDescriptorImpl moduleDescriptor : config.getModuleDescriptors()) {
-            module.addDependencyOnModule(moduleDescriptor);
-        }
-
-        module.addDependencyOnModule(KotlinBuiltIns.getInstance().getBuiltInsModule());
-
-        module.seal();
-
-        return module;
+    protected List<ModuleDescriptorImpl> commonDependencies(@NotNull StorageManager storageManager) {
+        List<ModuleDescriptorImpl> commonDependencies = new SmartList<ModuleDescriptorImpl>();
+        commonDependencies.addAll(super.commonDependencies(storageManager));
+        commonDependencies.addAll(config.getModuleDescriptors());
+        return commonDependencies;
     }
 
     protected Config getConfig() {

@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.resolve.lazy.NoTopLevelDescriptorProvider;
 import org.jetbrains.kotlin.resolve.lazy.NoFileScopeProvider;
 import org.jetbrains.kotlin.types.expressions.DeclarationScopeProviderForLocalClassifierAnalyzer;
 import org.jetbrains.kotlin.types.expressions.LocalLazyDeclarationResolver;
+import org.jetbrains.kotlin.resolve.BodyResolveTaskManager;
 import org.jetbrains.kotlin.resolve.BodyResolver;
 import org.jetbrains.kotlin.resolve.AnnotationResolver;
 import org.jetbrains.kotlin.resolve.calls.CallResolver;
@@ -89,6 +90,7 @@ public class InjectorForLazyLocalClassifierAnalyzer {
     private final NoFileScopeProvider noFileScopeProvider;
     private final DeclarationScopeProviderForLocalClassifierAnalyzer declarationScopeProviderForLocalClassifierAnalyzer;
     private final LocalLazyDeclarationResolver localLazyDeclarationResolver;
+    private final BodyResolveTaskManager bodyResolveTaskManager;
     private final BodyResolver bodyResolver;
     private final AnnotationResolver annotationResolver;
     private final CallResolver callResolver;
@@ -147,6 +149,7 @@ public class InjectorForLazyLocalClassifierAnalyzer {
         this.noFileScopeProvider = NoFileScopeProvider.INSTANCE$;
         this.localLazyDeclarationResolver = new LocalLazyDeclarationResolver(moduleContext, bindingTrace, localClassDescriptorHolder);
         this.declarationScopeProviderForLocalClassifierAnalyzer = new DeclarationScopeProviderForLocalClassifierAnalyzer(localLazyDeclarationResolver, localClassDescriptorHolder);
+        this.bodyResolveTaskManager = new BodyResolveTaskManager();
         this.bodyResolver = new BodyResolver();
         this.annotationResolver = new AnnotationResolver();
         this.callResolver = new CallResolver();
@@ -182,6 +185,7 @@ public class InjectorForLazyLocalClassifierAnalyzer {
         this.overrideResolver = new OverrideResolver();
         this.varianceChecker = new VarianceChecker(bindingTrace);
 
+        this.lazyTopDownAnalyzer.setBodyResolveTaskManager(bodyResolveTaskManager);
         this.lazyTopDownAnalyzer.setBodyResolver(bodyResolver);
         this.lazyTopDownAnalyzer.setDeclarationResolver(declarationResolver);
         this.lazyTopDownAnalyzer.setDeclarationScopeProvider(declarationScopeProviderForLocalClassifierAnalyzer);
@@ -198,6 +202,13 @@ public class InjectorForLazyLocalClassifierAnalyzer {
 
         localLazyDeclarationResolver.setDeclarationScopeProvider(declarationScopeProviderForLocalClassifierAnalyzer);
         localLazyDeclarationResolver.setTopLevelDescriptorProvider(noTopLevelDescriptorProvider);
+
+        bodyResolveTaskManager.setBodyResolver(bodyResolver);
+        bodyResolveTaskManager.setDeclarationScopeProvider(declarationScopeProviderForLocalClassifierAnalyzer);
+        bodyResolveTaskManager.setLazyDeclarationResolver(localLazyDeclarationResolver);
+        bodyResolveTaskManager.setStorageManager(storageManager);
+        bodyResolveTaskManager.setTopLevelDescriptorProvider(noTopLevelDescriptorProvider);
+        bodyResolveTaskManager.setTrace(bindingTrace);
 
         bodyResolver.setAdditionalCheckerProvider(additionalCheckerProvider);
         bodyResolver.setAnnotationResolver(annotationResolver);

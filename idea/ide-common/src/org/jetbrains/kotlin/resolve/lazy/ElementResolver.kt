@@ -45,7 +45,7 @@ import org.jetbrains.kotlin.types.TypeUtils
 import org.jetbrains.kotlin.utils.Profiler
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 
-public abstract class ElementResolver protected(public val resolveSession: ResolveSession) {
+public abstract class ElementResolver protected constructor(public val resolveSession: ResolveSession) {
 
     public open fun getElementAdditionalResolve(jetElement: JetElement): BindingTrace {
         return performElementAdditionalResolve(jetElement, jetElement, BodyResolveMode.FULL)
@@ -521,5 +521,7 @@ public abstract class ElementResolver protected(public val resolveSession: Resol
         override fun getOuterDataFlowInfo(): DataFlowInfo = DataFlowInfo.EMPTY
 
         override fun getTopDownAnalysisMode() = topDownAnalysisMode
+
+        override fun getBodyResolveTaskManager() = null
     }
 }

@@ -65,6 +65,7 @@ public class BodyResolver {
     private FunctionAnalyzerExtension functionAnalyzerExtension;
     private AdditionalCheckerProvider additionalCheckerProvider;
     private ValueParameterResolver valueParameterResolver;
+    //private BodyResolveTaskManager bodyResolveTaskManager;
 
     @Inject
     public void setScriptBodyResolverResolver(@NotNull ScriptBodyResolver scriptBodyResolverResolver) {
@@ -140,10 +141,10 @@ public class BodyResolver {
 
         //Profiler profiler2 = Profiler.create("Body resolve one 2222");
         //profiler2.start();
-        // resolveFunctionBodies(c);
+        resolveFunctionBodies(c);
 
         // Temp
-        resolveBodiesFun.invoke();
+        // resolveBodiesFun.invoke();
 
         //profiler2.end();
 
@@ -748,10 +749,24 @@ public class BodyResolver {
         for (Map.Entry<JetNamedFunction, SimpleFunctionDescriptor> entry : c.getFunctions().entrySet()) {
             JetNamedFunction declaration = entry.getKey();
 
+            BodyResolveTaskManager bodyResolveTaskManager = c.getBodyResolveTaskManager();
+
             JetScope scope = c.getDeclaringScope(declaration);
             assert scope != null : "Scope is null: " + PsiUtilPackage.getElementTextWithContext(declaration);
 
-            resolveFunctionBody(c.getOuterDataFlowInfo(), trace, declaration, entry.getValue(), scope);
+            if (bodyResolveTaskManager != null && !c.getTopDownAnalysisMode().getIsLocalDeclarations()) {
+                BodyResolveResult result = bodyResolveTaskManager.resolveFunctionBody(declaration);
+
+                // Check resolve context..
+                assert result.getResolveContext().getDeclaringScope() == scope &&
+                        result.getResolveContext().getFunctionDescriptor() == entry.getValue() &&
+                        result.getResolveContext().getOuterDataFlowInfo() == c.getOuterDataFlowInfo();
+
+                result.getResultTrace().addAllMyDataTo(trace);
+            }
+            else {
+                resolveFunctionBody(c.getOuterDataFlowInfo(), trace, declaration, entry.getValue(), scope);
+            }
         }
     }
 
@@ -763,7 +778,15 @@ public class BodyResolver {
             @NotNull JetScope declaringScope
     ) {
         computeDeferredType(functionDescriptor.getReturnType());
-        resolveFunctionBody(outerDataFlowInfo, trace, function, functionDescriptor, declaringScope, null, null);
+
+        //if (c.getTopDownAnalysisMode().getIsLocalDeclarations()) {
+            resolveFunctionBody(outerDataFlowInfo, trace, function, functionDescriptor, declaringScope, null, null);
+        //}
+        //else {
+        //    DelegatingBindingTrace delegatingBindingTrace =
+        //            bodyResolveTaskManager.resolveFunctionBody(outerDataFlowInfo, trace, function, functionDescriptor, declaringScope);
+        //
+        //}
 
         assert functionDescriptor.getReturnType() != null;
     }
@@ -835,27 +858,26 @@ public class BodyResolver {
 
     private void computeDeferredTypes() {
         Collection<Box<DeferredType>> deferredTypes = trace.getKeys(DEFERRED_TYPE);
-        if (deferredTypes != null) {
-            // +1 is a work around agains new Queue(0).addLast(...) bug // stepan.koltsov@ 2011-11-21
-            final Queue<DeferredType> queue = new Queue<DeferredType>(deferredTypes.size() + 1);
-            trace.addHandler(DEFERRED_TYPE, new ObservableBindingTrace.RecordHandler<Box<DeferredType>, Boolean>() {
-                @Override
-                public void handleRecord(WritableSlice<Box<DeferredType>, Boolean> deferredTypeKeyDeferredTypeWritableSlice, Box<DeferredType> key, Boolean value) {
-                    queue.addLast(key.getData());
-                }
-            });
-            for (Box<DeferredType> deferredType : deferredTypes) {
-                queue.addLast(deferredType.getData());
+
+        // +1 is a work around agains new Queue(0).addLast(...) bug // stepan.koltsov@ 2011-11-21
+        final Queue<DeferredType> queue = new Queue<DeferredType>(deferredTypes.size() + 1);
+        trace.addHandler(DEFERRED_TYPE, new ObservableBindingTrace.RecordHandler<Box<DeferredType>, Boolean>() {
+            @Override
+            public void handleRecord(WritableSlice<Box<DeferredType>, Boolean> deferredTypeKeyDeferredTypeWritableSlice, Box<DeferredType> key, Boolean value) {
+                queue.addLast(key.getData());
             }
-            while (!queue.isEmpty()) {
-                DeferredType deferredType = queue.pullFirst();
-                if (!deferredType.isComputed()) {
-                    try {
-                        deferredType.getDelegate(); // to compute
-                    }
-                    catch (ReenteringLazyValueComputationException e) {
-                        // A problem should be reported while computing the type
-                    }
+        });
+        for (Box<DeferredType> deferredType : deferredTypes) {
+            queue.addLast(deferredType.getData());
+        }
+        while (!queue.isEmpty()) {
+            DeferredType deferredType = queue.pullFirst();
+            if (!deferredType.isComputed()) {
+                try {
+                    deferredType.getDelegate(); // to compute
+                }
+                catch (ReenteringLazyValueComputationException e) {
+                    // A problem should be reported while computing the type
                 }
             }
         }

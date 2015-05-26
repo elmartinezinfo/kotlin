@@ -48,6 +48,9 @@ public class LazyTopDownAnalyzerForTopLevel {
         this.lazyTopDownAnalyzer = lazyTopDownAnalyzer;
     }
 
+    public void setBodyResolveTaskManager(@NotNull BodyResolveTaskManager bodyResolveTaskManager) {
+    }
+
     @NotNull
     public TopDownAnalysisContext analyzeFiles(
             @NotNull TopDownAnalysisMode topDownAnalysisMode,

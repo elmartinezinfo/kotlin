@@ -51,17 +51,20 @@ public class TopDownAnalysisContext implements BodiesResolveContext {
 
     private final TopDownAnalysisMode topDownAnalysisMode;
     private final DeclarationScopeProvider declarationScopeProvider;
+    private final BodyResolveTaskManager bodyResolveTaskManager;
 
     private StringBuilder debugOutput;
 
     public TopDownAnalysisContext(
             @NotNull TopDownAnalysisMode topDownAnalysisMode,
             @NotNull DataFlowInfo outerDataFlowInfo,
-            @NotNull DeclarationScopeProvider declarationScopeProvider
+            @NotNull DeclarationScopeProvider declarationScopeProvider,
+            @Nullable BodyResolveTaskManager bodyResolveTaskManager
     ) {
         this.topDownAnalysisMode = topDownAnalysisMode;
         this.outerDataFlowInfo = outerDataFlowInfo;
         this.declarationScopeProvider = declarationScopeProvider;
+        this.bodyResolveTaskManager = bodyResolveTaskManager;
     }
 
     @Override
@@ -132,6 +135,12 @@ public class TopDownAnalysisContext implements BodiesResolveContext {
     @Override
     public JetScope getDeclaringScope(@NotNull JetDeclaration declaration) {
         return declarationScopeProvider.getResolutionScopeForDeclaration(declaration);
+    }
+
+    @Nullable
+    @Override
+    public BodyResolveTaskManager getBodyResolveTaskManager() {
+        return bodyResolveTaskManager;
     }
 
     @Override

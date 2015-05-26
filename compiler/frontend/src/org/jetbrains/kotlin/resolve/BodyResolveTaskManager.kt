@@ -19,15 +19,66 @@ package org.jetbrains.kotlin.resolve
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.psi.JetNamedFunction
 import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfo
-import org.jetbrains.kotlin.resolve.lazy.DeclarationScopeProvider
+import org.jetbrains.kotlin.resolve.lazy.DeclarationScopeProviderImpl
 import org.jetbrains.kotlin.resolve.lazy.ForceResolveUtil
 import org.jetbrains.kotlin.resolve.lazy.LazyDeclarationResolver
-import org.jetbrains.kotlin.resolve.lazy.ResolveSession
-import org.jetbrains.kotlin.storage.MemoizedFunctionToNotNull
+import org.jetbrains.kotlin.resolve.lazy.TopLevelDescriptorProvider
+import org.jetbrains.kotlin.resolve.scopes.JetScope
 import org.jetbrains.kotlin.storage.StorageManager
-import javax.annotation.PostConstruct
 import javax.inject.Inject
+import kotlin.properties.Delegates
 
-public interface BodyResolveTaskManager {
-    public fun resolveFunctionBody(namedFunction: JetNamedFunction): BindingTrace
+public data class BodyResolveContext(
+        val outerDataFlowInfo: DataFlowInfo,
+        val baseTrace: BindingTrace,
+        val functionDescriptor: FunctionDescriptor,
+        val declaringScope: JetScope
+)
+
+public data class BodyResolveResult(
+        val resultTrace: DelegatingBindingTrace,
+        val resolveContext: BodyResolveContext
+)
+
+public open class BodyResolveTaskManager {
+    public var bodyResolver: BodyResolver by Delegates.notNull()
+        @Inject set
+
+    public var storageManager: StorageManager by Delegates.notNull()
+        @Inject set
+
+    public var topLevelDescriptorProvider: TopLevelDescriptorProvider by Delegates.notNull()
+        @Inject set
+
+    public var declarationScopeProvider: DeclarationScopeProviderImpl by Delegates.notNull()
+        @Inject set
+
+    public var trace: BindingTrace by Delegates.notNull()
+        @Inject set
+
+    public var lazyDeclarationResolver: LazyDeclarationResolver by Delegates.notNull()
+        @Inject set
+
+    public open fun resolveFunctionBody(function: JetNamedFunction): BodyResolveResult {
+        val scope = declarationScopeProvider.getResolutionScopeForDeclaration(function)
+        val functionDescriptor = lazyDeclarationResolver.resolveToDescriptor(function) as FunctionDescriptor
+        val dataFlowInfo = DataFlowInfo.EMPTY
+
+        return resolveFunctionBody(function, BodyResolveContext(dataFlowInfo, trace, functionDescriptor, scope))
+    }
+
+    private fun resolveFunctionBody(function: JetNamedFunction, context: BodyResolveContext): BodyResolveResult {
+        val delegatingBindingTrace = DelegatingBindingTrace(context.baseTrace.getBindingContext(), "Trace to resolve element", function)
+
+        ForceResolveUtil.forceResolveAllContents(context.functionDescriptor)
+        bodyResolver.resolveFunctionBody(context.outerDataFlowInfo, delegatingBindingTrace, function, context.functionDescriptor, context.declaringScope)
+
+        return BodyResolveResult(delegatingBindingTrace, context)
+    }
+}
+
+public class DummyBodyResolveTaskManager: BodyResolveTaskManager() {
+    public override fun resolveFunctionBody(function: JetNamedFunction): BodyResolveResult {
+        throw UnsupportedOperationException()
+    }
 }

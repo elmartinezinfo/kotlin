@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.psi.JetNamedFunction;
 import org.jetbrains.kotlin.resolve.AdditionalCheckerProvider;
 import org.jetbrains.kotlin.resolve.BindingContext;
 import org.jetbrains.kotlin.resolve.BindingTrace;
+import org.jetbrains.kotlin.resolve.BodyResolveTaskManager;
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode;
 import org.jetbrains.kotlin.resolve.lazy.ElementResolver;
 import org.jetbrains.kotlin.resolve.lazy.ProbablyNothingCallableNames;
@@ -43,11 +44,13 @@ import java.util.Collection;
 
 public class ResolveElementCache extends ElementResolver {
     private final Project project;
+    private BodyResolveTaskManager bodyResolveTaskManager;
     private final CachedValue<MemoizedFunctionToNotNull<JetElement, BindingTrace>> additionalResolveCache;
 
-    public ResolveElementCache(ResolveSession resolveSession, Project project) {
+    public ResolveElementCache(ResolveSession resolveSession, Project project, final BodyResolveTaskManager bodyResolveTaskManager) {
         super(resolveSession);
         this.project = project;
+        this.bodyResolveTaskManager = bodyResolveTaskManager;
 
         // Recreate internal cache after change of modification count
         this.additionalResolveCache =
@@ -61,6 +64,9 @@ public class ResolveElementCache extends ElementResolver {
                                         manager.createMemoizedFunction(new Function1<JetElement, BindingTrace>() {
                                             @Override
                                             public BindingTrace invoke(JetElement jetElement) {
+                                                if (jetElement instanceof JetNamedFunction) {
+                                                    // bodyResolveTaskManager.resolveFunctionBody()
+                                                }
                                                 return performElementAdditionalResolve(jetElement, jetElement, BodyResolveMode.FULL);
                                             }
                                         });

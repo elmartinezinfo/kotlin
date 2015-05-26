@@ -60,6 +60,7 @@ import org.jetbrains.kotlin.resolve.lazy.DeclarationScopeProviderImpl;
 import org.jetbrains.kotlin.resolve.ScriptBodyResolver;
 import org.jetbrains.kotlin.resolve.lazy.ScopeProvider.AdditionalFileScopeProvider;
 import org.jetbrains.kotlin.resolve.LazyTopDownAnalyzer;
+import org.jetbrains.kotlin.resolve.BodyResolveTaskManager;
 import org.jetbrains.kotlin.resolve.BodyResolver;
 import org.jetbrains.kotlin.resolve.ControlFlowAnalyzer;
 import org.jetbrains.kotlin.resolve.DeclarationsChecker;
@@ -120,6 +121,7 @@ public class InjectorForTopDownAnalyzerForJs {
     private final ScriptBodyResolver scriptBodyResolver;
     private final AdditionalFileScopeProvider additionalFileScopeProvider;
     private final LazyTopDownAnalyzer lazyTopDownAnalyzer;
+    private final BodyResolveTaskManager bodyResolveTaskManager;
     private final BodyResolver bodyResolver;
     private final ControlFlowAnalyzer controlFlowAnalyzer;
     private final DeclarationsChecker declarationsChecker;
@@ -179,6 +181,7 @@ public class InjectorForTopDownAnalyzerForJs {
         this.scriptBodyResolver = new ScriptBodyResolver();
         this.additionalFileScopeProvider = new AdditionalFileScopeProvider();
         this.lazyTopDownAnalyzer = new LazyTopDownAnalyzer();
+        this.bodyResolveTaskManager = new BodyResolveTaskManager();
         this.bodyResolver = new BodyResolver();
         this.controlFlowAnalyzer = new ControlFlowAnalyzer();
         this.declarationsChecker = new DeclarationsChecker();
@@ -275,6 +278,7 @@ public class InjectorForTopDownAnalyzerForJs {
         scriptBodyResolver.setAdditionalCheckerProvider(kotlinJsCheckerProvider);
         scriptBodyResolver.setExpressionTypingServices(expressionTypingServices);
 
+        lazyTopDownAnalyzer.setBodyResolveTaskManager(bodyResolveTaskManager);
         lazyTopDownAnalyzer.setBodyResolver(bodyResolver);
         lazyTopDownAnalyzer.setDeclarationResolver(declarationResolver);
         lazyTopDownAnalyzer.setDeclarationScopeProvider(declarationScopeProvider);
@@ -286,6 +290,13 @@ public class InjectorForTopDownAnalyzerForJs {
         lazyTopDownAnalyzer.setTopLevelDescriptorProvider(resolveSession);
         lazyTopDownAnalyzer.setTrace(bindingTrace);
         lazyTopDownAnalyzer.setVarianceChecker(varianceChecker);
+
+        bodyResolveTaskManager.setBodyResolver(bodyResolver);
+        bodyResolveTaskManager.setDeclarationScopeProvider(declarationScopeProvider);
+        bodyResolveTaskManager.setLazyDeclarationResolver(lazyDeclarationResolver);
+        bodyResolveTaskManager.setStorageManager(storageManager);
+        bodyResolveTaskManager.setTopLevelDescriptorProvider(resolveSession);
+        bodyResolveTaskManager.setTrace(bindingTrace);
 
         bodyResolver.setAdditionalCheckerProvider(kotlinJsCheckerProvider);
         bodyResolver.setAnnotationResolver(annotationResolver);

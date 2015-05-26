@@ -16,7 +16,6 @@
 
 package org.jetbrains.kotlin.resolve;
 
-import com.google.common.base.Function;
 import org.jetbrains.annotations.Mutable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -49,6 +48,9 @@ public interface BodiesResolveContext {
 
     @Nullable
     JetScope getDeclaringScope(@NotNull JetDeclaration declaration);
+
+    @Nullable
+    BodyResolveTaskManager getBodyResolveTaskManager();
 
     @NotNull
     DataFlowInfo getOuterDataFlowInfo();

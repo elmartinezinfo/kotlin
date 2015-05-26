@@ -155,7 +155,6 @@ private class PerFileAnalysisCache(val file: JetFile, val resolveSession: Resolv
         val analyzableParent = KotlinResolveDataProvider.findAnalyzableParent(element)
 
         return synchronized<AnalysisResult>(this) {
-
             val cached = lookUp(analyzableParent)
             if (cached != null) return@synchronized cached
 

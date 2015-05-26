@@ -24,33 +24,34 @@ import org.jetbrains.kotlin.descriptors.*;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilPackage;
-import org.jetbrains.kotlin.resolve.BindingContext;
-import org.jetbrains.kotlin.resolve.BindingContextUtils;
-import org.jetbrains.kotlin.resolve.BindingTrace;
-import org.jetbrains.kotlin.resolve.BodyResolveTaskManager;
+import org.jetbrains.kotlin.resolve.*;
+import org.jetbrains.kotlin.resolve.calls.smartcasts.DataFlowInfo;
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode;
 import org.jetbrains.kotlin.resolve.lazy.KotlinCodeAnalyzer;
 import org.jetbrains.kotlin.resolve.lazy.ResolveSession;
 import org.jetbrains.kotlin.resolve.lazy.ScopeProvider;
 import org.jetbrains.kotlin.resolve.lazy.descriptors.LazyPackageDescriptor;
+import org.jetbrains.kotlin.resolve.scopes.JetScope;
 import org.jetbrains.kotlin.storage.ExceptionTracker;
 import org.jetbrains.kotlin.storage.StorageManager;
 
 import java.util.Collection;
 
-public class ResolveSessionForBodies implements KotlinCodeAnalyzer, BodyResolveTaskManager {
+public class ResolveSessionForBodies implements KotlinCodeAnalyzer {
     private final Object createdForObject;
     private final ResolveSession resolveSession;
+    private final BodyResolveTaskManager bodyResolveTaskManager;
     private final ResolveElementCache resolveElementCache;
 
-    public ResolveSessionForBodies(@NotNull Project project, @NotNull ResolveSession resolveSession) {
-        this(project, project, resolveSession);
+    public ResolveSessionForBodies(@NotNull Project project, @NotNull ResolveSession resolveSession, @NotNull BodyResolveTaskManager bodyResolveTaskManager) {
+        this(project, project, resolveSession, bodyResolveTaskManager);
     }
 
-    private ResolveSessionForBodies(Object createdForObject, Project project, ResolveSession resolveSession) {
+    private ResolveSessionForBodies(Object createdForObject, Project project, ResolveSession resolveSession, @NotNull BodyResolveTaskManager bodyResolveTaskManager) {
         this.createdForObject = createdForObject;
         this.resolveSession = resolveSession;
-        this.resolveElementCache = new ResolveElementCache(resolveSession, project);
+        this.bodyResolveTaskManager = bodyResolveTaskManager;
+        this.resolveElementCache = new ResolveElementCache(resolveSession, project, bodyResolveTaskManager);
     }
 
     @NotNull
@@ -142,8 +143,14 @@ public class ResolveSessionForBodies implements KotlinCodeAnalyzer, BodyResolveT
     }
 
     @NotNull
-    @Override
-    public BindingTrace resolveFunctionBody(@NotNull JetNamedFunction namedFunction) {
-        return resolveElementCache.getElementAdditionalResolve(namedFunction);
+    //@Override
+    public DelegatingBindingTrace resolveFunctionBody(
+            @NotNull DataFlowInfo outerDataFlowInfo,
+            @NotNull BindingTrace baseTrace,
+            @NotNull JetNamedFunction function,
+            @NotNull FunctionDescriptor functionDescriptor,
+            @NotNull JetScope declaringScope) {
+        // return resolveElementCache.getElementAdditionalResolve(namedFunction);
+        return null;
     }
 }

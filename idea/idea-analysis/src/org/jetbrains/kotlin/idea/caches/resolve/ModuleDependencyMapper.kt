@@ -23,14 +23,27 @@ import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.ModuleRootManager
 import org.jetbrains.kotlin.analyzer.*
 import org.jetbrains.kotlin.context.GlobalContextImpl
+import org.jetbrains.kotlin.context.SimpleGlobalContext
+import org.jetbrains.kotlin.context.withModule
 import org.jetbrains.kotlin.context.withProject
+import org.jetbrains.kotlin.di.InjectorForBodyResolve
 import org.jetbrains.kotlin.idea.project.ResolveSessionForBodies
+import org.jetbrains.kotlin.idea.project.TargetPlatform
+import org.jetbrains.kotlin.idea.project.TargetPlatformDetector
 import org.jetbrains.kotlin.load.java.structure.JavaClass
 import org.jetbrains.kotlin.load.java.structure.impl.JavaClassImpl
 import org.jetbrains.kotlin.psi.JetFile
+import org.jetbrains.kotlin.resolve.BindingTrace
+import org.jetbrains.kotlin.resolve.BodyResolveTaskManager
+import org.jetbrains.kotlin.resolve.StatementFilter
 import org.jetbrains.kotlin.resolve.jvm.JvmPlatformParameters
+import org.jetbrains.kotlin.resolve.lazy.DeclarationScopeProviderImpl
+import org.jetbrains.kotlin.resolve.lazy.LazyDeclarationResolver
+import org.jetbrains.kotlin.resolve.lazy.TopLevelDescriptorProvider
 import org.jetbrains.kotlin.storage.ExceptionTracker
+import org.jetbrains.kotlin.types.expressions.LocalLazyDeclarationResolver
 import org.jetbrains.kotlin.utils.keysToMap
+import kotlin.properties.Delegates
 
 fun createModuleResolverProvider(
         project: Project,
@@ -72,7 +85,23 @@ fun createModuleResolverProvider(
     val moduleToBodiesResolveSession = modulesToCreateResolversFor.keysToMap {
         module ->
         val analyzer = resolverForProject.resolverForModule(module)
-        ResolveSessionForBodies(project, analyzer.lazyResolveSession)
+        val resolveSession = analyzer.lazyResolveSession
+
+        // TODO: Temp
+        val bodyResolve = InjectorForBodyResolve(
+                globalContext.withProject(project).withModule(resolveSession.getModuleDescriptor()),
+                resolveSession.getTrace(), TargetPlatform.JVM.getAdditionalCheckerProvider(), StatementFilter.NONE
+        )
+
+        val bodyResolveTaskManager = BodyResolveTaskManager()
+        bodyResolveTaskManager.storageManager = resolveSession.getStorageManager()
+        bodyResolveTaskManager.bodyResolver = bodyResolve.getBodyResolver()
+        bodyResolveTaskManager.topLevelDescriptorProvider = resolveSession
+        bodyResolveTaskManager.declarationScopeProvider = resolveSession.getDescriptorResolver()
+        bodyResolveTaskManager.trace = resolveSession.getTrace()
+        bodyResolveTaskManager.lazyDeclarationResolver = LocalLazyDeclarationResolver(moduleContext, bindingTrace, localClassDescriptorHolder)
+
+        ResolveSessionForBodies(project, resolveSession, bodyResolveTaskManager)
     }
     return ModuleResolverProviderImpl(
             resolverForProject,

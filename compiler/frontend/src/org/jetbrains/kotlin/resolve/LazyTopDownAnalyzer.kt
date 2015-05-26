@@ -49,6 +49,7 @@ public class LazyTopDownAnalyzer {
     private var topLevelDescriptorProvider: TopLevelDescriptorProvider? = null
     private var fileScopeProvider: FileScopeProvider? = null
     private var declarationScopeProvider: DeclarationScopeProvider? = null
+    private var bodyResolveTaskManager: BodyResolveTaskManager? = null
 
     Inject
     public fun setLazyDeclarationResolver(lazyDeclarationResolver: LazyDeclarationResolver) {
@@ -105,8 +106,13 @@ public class LazyTopDownAnalyzer {
         this.bodyResolver = bodyResolver
     }
 
+    Inject
+    public fun setBodyResolveTaskManager(bodyResolveTaskManager: BodyResolveTaskManager) {
+        this.bodyResolveTaskManager = bodyResolveTaskManager
+    }
+
     public fun analyzeDeclarations(topDownAnalysisMode: TopDownAnalysisMode, declarations: Collection<PsiElement>, outerDataFlowInfo: DataFlowInfo): TopDownAnalysisContext {
-        val c = TopDownAnalysisContext(topDownAnalysisMode, outerDataFlowInfo, declarationScopeProvider!!)
+        val c = TopDownAnalysisContext(topDownAnalysisMode, outerDataFlowInfo, declarationScopeProvider!!, bodyResolveTaskManager)
 
         val topLevelFqNames = HashMultimap.create<FqName, JetElement>()
 
@@ -255,15 +261,17 @@ public class LazyTopDownAnalyzer {
 
         bodyResolver!!.resolveBodies(c) {
             for ((declaration, descriptor) in c.getFunctions().entrySet()) {
-                if (!topDownAnalysisMode.isLocalDeclarations && topLevelDescriptorProvider is BodyResolveTaskManager) {
-                    val bindingTrace = (topLevelDescriptorProvider as BodyResolveTaskManager).resolveFunctionBody(declaration)
-                    ((bindingTrace as LockBasedLazyResolveStorageManager.LockProtectedTrace).trace as DelegatingBindingTrace).addAllMyDataTo(trace!!)
-
-                    assert(descriptor.getReturnType() != null)
-                }
-                else {
+//                if (!topDownAnalysisMode.isLocalDeclarations && topLevelDescriptorProvider is BodyResolveTaskManager) {
+//                    val bindingTrace = (topLevelDescriptorProvider as BodyResolveTaskManager).resolveFunctionBody(
+//                            c.getOuterDataFlowInfo(), trace!!, declaration, descriptor, c.getDeclaringScope(declaration)!!)
+//
+//                    bindingTrace.addAllMyDataTo(trace!!)
+//
+//                    assert(descriptor.getReturnType() != null)
+//                }
+//                else {
                     bodyResolver!!.resolveFunctionBody(c.getOuterDataFlowInfo(), trace!!, declaration, descriptor, c.getDeclaringScope(declaration)!!)
-                }
+//                }
             }
         }
 

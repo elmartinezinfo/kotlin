@@ -48,21 +48,16 @@ fun JetFunctionLiteralArgument.moveInsideParenthesesAndReplaceWith(
 
     val psiFactory = JetPsiFactory(getProject())
     val argument = if (newCallExpression.getValueArgumentsInParentheses().any { it.getArgumentName() != null }) {
-        psiFactory.createArgumentWithName(functionLiteralArgumentName, replacement)
+        psiFactory.createArgument(replacement, functionLiteralArgumentName)
     }
     else {
         psiFactory.createArgument(replacement)
     }
 
-    val functionLiteralArgument = newCallExpression.getFunctionLiteralArguments().head!!
+    val functionLiteralArgument = newCallExpression.getFunctionLiteralArguments().firstOrNull()!!
     val valueArgumentList = newCallExpression.getValueArgumentList() ?: psiFactory.createCallArguments("()")
 
-    val closingParenthesis = valueArgumentList.getLastChild()
-    if (valueArgumentList.getArguments().isNotEmpty()) {
-        valueArgumentList.addBefore(psiFactory.createComma(), closingParenthesis)
-        valueArgumentList.addBefore(psiFactory.createWhiteSpace(), closingParenthesis)
-    }
-    valueArgumentList.addBefore(argument, closingParenthesis)
+    valueArgumentList.addArgument(argument)
 
     (functionLiteralArgument.getPrevSibling() as? PsiWhiteSpace)?.delete()
     if (newCallExpression.getValueArgumentList() != null) {
@@ -74,20 +69,20 @@ fun JetFunctionLiteralArgument.moveInsideParenthesesAndReplaceWith(
     return oldCallExpression.replace(newCallExpression) as JetCallExpression
 }
 
-fun JetCallElement.moveLambdaOutsideParentheses() {
-    val args = getValueArgumentsInParentheses()
-    val functionLiteral = args.last!!.getArgumentExpression()?.getText()
-    val calleeText = getCalleeExpression()?.getText()
-    if (calleeText == null || functionLiteral == null) return
+fun JetCallExpression.moveFunctionLiteralOutsideParentheses() {
+    assert(getFunctionLiteralArguments().isEmpty())
+    val argumentList = getValueArgumentList()!!
+    val argument = argumentList.getArguments().last()
+    val expression = argument.getArgumentExpression()!!
+    assert(expression.unpackFunctionLiteral() != null)
 
-    val params = args.subList(0, args.size - 1).map { it.asElement().getText() ?: "" }.joinToString(", ", "(", ")")
-
-    val newCall =
-            if (params == "()") {
-                "$calleeText $functionLiteral"
-            }
-            else {
-                "$calleeText$params $functionLiteral"
-            }
-    replace(JetPsiFactory(this).createExpression(newCall))
+    val dummyCall = JetPsiFactory(this).createExpressionByPattern("foo()$0:'{}'", expression) as JetCallExpression
+    val functionLiteralArgument = dummyCall.getFunctionLiteralArguments().single()
+    this.add(functionLiteralArgument)
+    if (argumentList.getArguments().size() > 1) {
+        argumentList.removeArgument(argument)
+    }
+    else {
+        argumentList.delete()
+    }
 }

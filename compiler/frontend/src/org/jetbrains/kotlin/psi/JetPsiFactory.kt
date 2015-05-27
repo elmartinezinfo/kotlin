@@ -23,20 +23,22 @@ import com.intellij.openapi.util.Key
 import com.intellij.psi.PsiComment
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFileFactory
-import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.LocalTimeCounter
 import org.jetbrains.kotlin.analyzer.ModuleInfo
 import org.jetbrains.kotlin.idea.JetFileType
 import org.jetbrains.kotlin.lexer.JetKeywordToken
+import org.jetbrains.kotlin.lexer.JetModifierKeywordToken
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.renderName
 import org.jetbrains.kotlin.psi.JetPsiFactory.CallableBuilder.Target
 import org.jetbrains.kotlin.resolve.ImportPath
 import java.io.PrintWriter
 import java.io.StringWriter
 
 public fun JetPsiFactory(project: Project?): JetPsiFactory = JetPsiFactory(project!!)
-public fun JetPsiFactory(contextElement: JetElement): JetPsiFactory = JetPsiFactory(contextElement.getProject())
+public fun JetPsiFactory(elementForProject: PsiElement): JetPsiFactory = JetPsiFactory(elementForProject.getProject())
 
 public var JetFile.doNotAnalyze: String? by UserDataProperty(Key.create("DO_NOT_ANALYZE"))
 public var JetFile.analysisContext: PsiElement? by UserDataProperty(Key.create("ANALYSIS_CONTEXT"))
@@ -64,7 +66,11 @@ public class JetPsiFactory(private val project: Project) {
 
     public fun createExpression(text: String): JetExpression {
         //TODO: '\n' below if important - some strange code indenting problems appear without it
-        return createProperty("val x =\n$text").getInitializer() ?: error("Failed to create expression from text: '$text'")
+        val expression = createProperty("val x =\n$text").getInitializer() ?: error("Failed to create expression from text: '$text'")
+        assert(expression.getText() == text) {
+            "Failed to create expression from text: '$text', resulting expression's text was: '${expression.getText()}'"
+        }
+        return expression
     }
 
     public fun createClassLiteral(className: String): JetClassLiteralExpression =
@@ -183,12 +189,12 @@ public class JetPsiFactory(private val project: Project) {
         return createDeclaration(text)
     }
 
-    public fun <T> createDeclaration(text: String): T {
+    public fun <TDeclaration : JetDeclaration> createDeclaration(text: String): TDeclaration {
         val file = createFile(text)
-        val dcls = file.getDeclarations()
-        assert(dcls.size() == 1) { "${dcls.size()} declarations in $text" }
-        [suppress("UNCHECKED_CAST")]
-        val result = dcls.first() as T
+        val declarations = file.getDeclarations()
+        assert(declarations.size() == 1) { "${declarations.size()} declarations in $text" }
+        @suppress("UNCHECKED_CAST")
+        val result = declarations.first() as TDeclaration
         return result
     }
 
@@ -220,12 +226,16 @@ public class JetPsiFactory(private val project: Project) {
         return createClass("class Foo {\n $decl \n}").getSecondaryConstructors().first()
     }
 
-    public fun createModifierList(modifier: JetKeywordToken): JetModifierList {
+    public fun createModifierList(modifier: JetModifierKeywordToken): JetModifierList {
         return createModifierList(modifier.getValue())
     }
 
     public fun createModifierList(text: String): JetModifierList {
         return createProperty(text + " val x").getModifierList()!!
+    }
+
+    public fun createModifier(modifier: JetModifierKeywordToken): PsiElement {
+        return createModifierList(modifier.getValue()).getModifier(modifier)!!
     }
 
     public fun createAnnotationEntry(text: String): JetAnnotationEntry {
@@ -350,20 +360,31 @@ public class JetPsiFactory(private val project: Project) {
         return JetBlockCodeFragment(project, "fragment.kt", text, null, context)
     }
 
-    public fun createIf(condition: JetExpression, thenExpr: JetExpression, elseExpr: JetExpression?): JetIfExpression {
+    public fun createIf(condition: JetExpression, thenExpr: JetExpression, elseExpr: JetExpression? = null): JetIfExpression {
         return (if (elseExpr != null)
             createExpressionByPattern("if ($0) $1 else $2", condition, thenExpr, elseExpr) as JetIfExpression
         else
             createExpressionByPattern("if ($0) $1", condition, thenExpr)) as JetIfExpression
     }
 
-    public fun createArgumentWithName(name: String?, argumentExpression: JetExpression): JetValueArgument {
-        val argumentText = (if (name != null) "$name = " else "") + argumentExpression.getText()
-        return createCallArguments("($argumentText)").getArguments().first()
-    }
+    public fun createArgument(expression: JetExpression, name: String? = null, isSpread: Boolean = false): JetValueArgument {
+        val argumentList = buildByPattern({ pattern, args -> createByPattern(pattern, *args) { createCallArguments(it) } }) {
+            appendFixedText("(")
 
-    public fun createArgument(argumentExpression: JetExpression): JetValueArgument {
-        return createArgumentWithName(null, argumentExpression)
+            if (name != null) {
+                appendName(Name.identifier(name))
+                appendFixedText("=")
+            }
+
+            if (isSpread) {
+                appendFixedText("*")
+            }
+
+            appendExpression(expression)
+
+            appendFixedText(")")
+        }
+        return argumentList.getArguments().single()
     }
 
     public fun createDelegatorToSuperCall(text: String): JetDelegatorToSuperCall {
@@ -550,8 +571,12 @@ public class JetPsiFactory(private val project: Project) {
         }
     }
 
-    public fun createFunctionBody(bodyText: String): JetBlockExpression {
+    public fun createBlock(bodyText: String): JetBlockExpression {
         return createFunction("fun foo() {\n" + bodyText + "\n}").getBodyExpression() as JetBlockExpression
+    }
+
+    public fun createSingleStatementBlock(statement: JetExpression): JetBlockExpression {
+        return createDeclarationByPattern<JetNamedFunction>("fun foo() {\n$0\n}", statement).getBodyExpression() as JetBlockExpression
     }
 
     public fun createComment(text: String): PsiComment {
@@ -562,21 +587,18 @@ public class JetPsiFactory(private val project: Project) {
         return comment
     }
 
-    public fun wrapInABlock(expression: JetExpression): JetBlockExpression {
+    // special hack used in ControlStructureTypingVisitor
+    // TODO: get rid of it
+    public fun wrapInABlockWrapper(expression: JetExpression): JetBlockExpression {
         if (expression is JetBlockExpression) {
             return expression
         }
-        return BlockWrapper(expression)
-    }
-
-    public fun BlockWrapper(expressionToWrap: JetExpression): BlockWrapper {
-        val function = createFunction("fun f() { ${expressionToWrap.getText()} }")
+        val function = createFunction("fun f() { ${expression.getText()} }")
         val block = function.getBodyExpression() as JetBlockExpression
-        return BlockWrapper(block, expressionToWrap)
+        return BlockWrapper(block, expression)
     }
 
-    private inner class BlockWrapper(fakeBlockExpression: JetBlockExpression, private val expression: JetExpression) : JetBlockExpression(fakeBlockExpression.getNode()), JetPsiUtil.JetExpressionWrapper {
-
+    private class BlockWrapper(fakeBlockExpression: JetBlockExpression, private val expression: JetExpression) : JetBlockExpression(fakeBlockExpression.getNode()), JetPsiUtil.JetExpressionWrapper {
         override fun getStatements(): List<JetElement> {
             return listOf(expression)
         }

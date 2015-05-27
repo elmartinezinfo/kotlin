@@ -45,12 +45,10 @@ public class ReplaceJavaClassAsAnnotationParameterFix(
                 diagnostic.createIntentionForFirstParentOfType(::ReplaceJavaClassAsAnnotationParameterFix)
 
         public fun createWholeProjectFixFactory(): JetSingleIntentionActionFactory = createIntentionFactory {
-            JetWholeProjectForEachElementOfTypeFix.createForMultiTask(
+            JetWholeProjectForEachElementOfTypeFix.createForMultiTaskOnElement(
                     tasksFactory = ::createReplacementTasksForAnnotationClass,
                     tasksProcessor = ::processTasks,
-                    modalTitle = JetBundle.message("replace.java.class.parameter.in.whole.project.modal.title"),
-                    name = JetBundle.message("replace.java.class.parameter.in.whole.project"),
-                    familyName = JetBundle.message("replace.java.class.parameter.in.whole.project.family")
+                    name = "Replace Class<T> with KClass<T> for each annotation in project"
             )
         }
     }

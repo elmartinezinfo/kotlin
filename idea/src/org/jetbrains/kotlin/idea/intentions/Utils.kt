@@ -89,7 +89,7 @@ fun splitPropertyDeclaration(property: JetProperty): JetBinaryExpression {
     val explicitTypeToSet = if (property.getTypeReference() != null) null else initializer.analyze().getType(initializer)
 
     val psiFactory = JetPsiFactory(property)
-    var assignment = psiFactory.createExpressionByPattern("$0 = $1", property.getName()!!, initializer)
+    var assignment = psiFactory.createExpressionByPattern("$0 = $1", property.getNameAsName()!!, initializer)
 
     assignment = parent.addAfter(assignment, property) as JetBinaryExpression
     parent.addAfter(psiFactory.createNewLine(), property)
@@ -112,5 +112,19 @@ val JetQualifiedExpression.calleeName: String?
 fun JetQualifiedExpression.toResolvedCall(): ResolvedCall<out CallableDescriptor>? {
     val callExpression = callExpression ?: return null
     return callExpression.getResolvedCall(callExpression.analyze()) ?: return null
+}
+
+fun JetExpression.isExitStatement(): Boolean {
+    when (this) {
+        is JetContinueExpression, is JetBreakExpression, is JetThrowExpression, is JetReturnExpression -> return true
+        else -> return false
+    }
+}
+
+// returns false for call of super, static method or method from package
+fun JetQualifiedExpression.isReceiverExpressionWithValue(): Boolean {
+    val receiver = getReceiverExpression()
+    if (receiver is JetSuperExpression) return false
+    return analyze().getType(receiver) != null
 }
 

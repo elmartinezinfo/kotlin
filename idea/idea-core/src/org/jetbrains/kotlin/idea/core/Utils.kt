@@ -18,9 +18,10 @@ package org.jetbrains.kotlin.idea.core
 
 import org.jetbrains.kotlin.descriptors.CallableDescriptor
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
-import org.jetbrains.kotlin.psi.Call
-import org.jetbrains.kotlin.psi.FunctionLiteralArgument
-import org.jetbrains.kotlin.psi.ValueArgument
+import org.jetbrains.kotlin.idea.util.getImplicitReceiversWithInstanceToExpression
+import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.resolve.scopes.JetScope
+import org.jetbrains.kotlin.resolve.scopes.receivers.ThisReceiver
 import java.util.HashMap
 
 public fun Call.mapArgumentsToParameters(targetDescriptor: CallableDescriptor): Map<ValueArgument, ValueParameterDescriptor> {
@@ -62,4 +63,12 @@ public fun Call.mapArgumentsToParameters(targetDescriptor: CallableDescriptor): 
     }
 
     return map
+}
+
+public fun ThisReceiver.asExpression(resolutionScope: JetScope, psiFactory: JetPsiFactory): JetExpression? {
+    val expressionFactory = resolutionScope.getImplicitReceiversWithInstanceToExpression()
+                                    .entrySet()
+                                    .firstOrNull { it.key.getContainingDeclaration() == this.getDeclarationDescriptor() }
+                                    ?.value ?: return null
+    return expressionFactory.createExpression(psiFactory)
 }

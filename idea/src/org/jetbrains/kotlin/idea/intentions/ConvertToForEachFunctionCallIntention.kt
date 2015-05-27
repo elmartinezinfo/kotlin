@@ -17,10 +17,12 @@
 package org.jetbrains.kotlin.idea.intentions
 
 import com.intellij.openapi.editor.Editor
+import org.jetbrains.kotlin.idea.core.CommentSaver
 import org.jetbrains.kotlin.psi.JetBlockExpression
 import org.jetbrains.kotlin.psi.JetForExpression
 import org.jetbrains.kotlin.psi.JetPsiFactory
 import org.jetbrains.kotlin.psi.createExpressionByPattern
+import org.jetbrains.kotlin.psi.psiUtil.contentRange
 import org.jetbrains.kotlin.psi.psiUtil.endOffset
 
 public class ConvertToForEachFunctionCallIntention : JetSelfTargetingIntention<JetForExpression>(javaClass(), "Replace with a forEach function call") {
@@ -31,16 +33,17 @@ public class ConvertToForEachFunctionCallIntention : JetSelfTargetingIntention<J
     }
 
     override fun applyTo(element: JetForExpression, editor: Editor) {
+        val commentSaver = CommentSaver(element)
+
         val body = element.getBody()!!
         val loopParameter = element.getLoopParameter()!!
 
-        val functionBodyText = when (body) {
-            is JetBlockExpression -> body.getStatements().map { it.getText() }.joinToString("\n")
-            else -> body.getText()
-        }
+        val functionBodyArgument: Any = if (body is JetBlockExpression) body.contentRange() else body
 
         val foreachExpression = JetPsiFactory(element).createExpressionByPattern(
-                "$0.forEach{$1->$2}", element.getLoopRange()!!, loopParameter, functionBodyText)
-        element.replace(foreachExpression)
+                "$0.forEach{$1->$2}", element.getLoopRange()!!, loopParameter, functionBodyArgument)
+        val result = element.replace(foreachExpression)
+
+        commentSaver.restoreComments(result)
     }
 }

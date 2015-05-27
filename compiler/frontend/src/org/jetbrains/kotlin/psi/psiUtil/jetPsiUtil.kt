@@ -238,13 +238,43 @@ public fun PsiElement.isExtensionDeclaration(): Boolean {
 
 public fun PsiElement.isObjectLiteral(): Boolean = this is JetObjectDeclaration && isObjectLiteral()
 
+//TODO: git rid of this method
 public fun PsiElement.deleteElementAndCleanParent() {
     val parent = getParent()
 
-    JetPsiUtil.deleteElementWithDelimiters(this)
-    @suppress("UNCHECKED_CAST")
-    JetPsiUtil.deleteChildlessElement(parent, this.javaClass)
+    deleteElementWithDelimiters(this)
+    deleteChildlessElement(parent, this.javaClass)
 }
+
+// Delete element if it doesn't contain children of a given type
+private fun <T : PsiElement> deleteChildlessElement(element: PsiElement, childClass: Class<T>) {
+    if (PsiTreeUtil.getChildrenOfType<T>(element, childClass) == null) {
+        element.delete()
+    }
+}
+
+// Delete given element and all the elements separating it from the neighboring elements of the same class
+private fun deleteElementWithDelimiters(element: PsiElement) {
+    val paramBefore = PsiTreeUtil.getPrevSiblingOfType<PsiElement>(element, element.javaClass)
+
+    val from: PsiElement
+    val to: PsiElement
+    if (paramBefore != null) {
+        from = paramBefore.getNextSibling()
+        to = element
+    }
+    else {
+        val paramAfter = PsiTreeUtil.getNextSiblingOfType<PsiElement>(element, element.javaClass)
+
+        from = element
+        to = if (paramAfter != null) paramAfter.getPrevSibling() else element
+    }
+
+    val parent = element.getParent()
+
+    parent.deleteChildRange(from, to)
+}
+
 
 public fun PsiElement.parameterIndex(): Int {
     val parent = getParent()
@@ -516,33 +546,58 @@ public fun PsiElement.getElementTextWithContext(): String {
 
 // Calls `block` on each descendant of T type
 // Note, that calls happen in order of DFS-exit, so deeper nodes are applied earlier
-inline fun <reified T : JetElement> forEachDescendantOfTypeVisitor(
-    noinline block: (T) -> Unit
-): JetVisitorVoid =
-        object : JetTreeVisitorVoid() {
-            override fun visitJetElement(element: JetElement) {
-                super.visitJetElement(element)
-                if (element is T) {
-                    block(element)
-                }
+public inline fun <reified T : JetElement> forEachDescendantOfTypeVisitor(noinline block: (T) -> Unit): JetVisitorVoid {
+    return object : JetTreeVisitorVoid() {
+        override fun visitJetElement(element: JetElement) {
+            super.visitJetElement(element)
+            if (element is T) {
+                block(element)
             }
         }
+    }
+}
 
-inline fun <reified T : JetElement, R> flatMapDescendantsOfTypeVisitor(
-    accumulator: MutableCollection<R>,
-    noinline map: (T) -> Collection<R>
-): JetVisitorVoid = forEachDescendantOfTypeVisitor<T> { accumulator.addAll(map(it)) }
+public inline fun <reified T : JetElement, R> flatMapDescendantsOfTypeVisitor(accumulator: MutableCollection<R>, noinline map: (T) -> Collection<R>): JetVisitorVoid {
+    return forEachDescendantOfTypeVisitor<T> { accumulator.addAll(map(it)) }
+}
 
-inline fun <reified T : JetElement> PsiElement.forEachDescendantsOfType(noinline block: (T) -> Unit) =
-        accept(forEachDescendantOfTypeVisitor(block))
-
-inline fun <reified T : JetElement> PsiElement.anyDescendantOfType(noinline predicate: (T) -> Boolean): Boolean {
-    var result = false
-    accept(forEachDescendantOfTypeVisitor<T> {
-        if (!result && predicate(it)) {
-            result = true
+public inline fun <reified T : PsiElement> PsiElement.forEachDescendantOfType(noinline action: (T) -> Unit) {
+    this.accept(object : PsiRecursiveElementVisitor(){
+        override fun visitElement(element: PsiElement) {
+            super.visitElement(element)
+            if (element is T) {
+                action(element)
+            }
         }
     })
+}
+
+public inline fun <reified T : PsiElement> PsiElement.anyDescendantOfType(noinline predicate: (T) -> Boolean = { true }): Boolean {
+    return findDescendantOfType(predicate) != null
+}
+
+public inline fun <reified T : PsiElement> PsiElement.findDescendantOfType(noinline predicate: (T) -> Boolean = { true }): T? {
+    var result: T? = null
+    this.accept(object : PsiRecursiveElementVisitor(){
+        override fun visitElement(element: PsiElement) {
+            if (result != null) return
+            if (element is T && predicate(element)) {
+                result = element
+                return
+            }
+            super.visitElement(element)
+        }
+    })
+    return result
+}
+
+public inline fun <reified T : PsiElement> PsiElement.collectDescendantsOfType(noinline predicate: (T) -> Boolean = { true }): List<T> {
+    val result = ArrayList<T>()
+    forEachDescendantOfType<T> {
+        if (predicate(it)) {
+            result.add(it)
+        }
+    }
     return result
 }
 
@@ -591,11 +646,17 @@ public fun JetElement.getCalleeHighlightingRange(): TextRange {
     return TextRange(startOffset, annotationEntry.getCalleeExpression().endOffset)
 }
 
-public val PsiElement.startOffset: Int
-    get() = getTextRange().getStartOffset()
-
-public val PsiElement.endOffset: Int
-    get() = getTextRange().getEndOffset()
+public fun JetBlockExpression.contentRange(): PsiChildRange {
+    val first = (getLBrace()?.getNextSibling() ?: getFirstChild())
+                        ?.siblings(withItself = false)
+                        ?.firstOrNull { it !is PsiWhiteSpace }
+    val rBrace = getRBrace()
+    if (first == rBrace) return PsiChildRange.EMPTY
+    val last = rBrace!!
+            .siblings(forward = false, withItself = false)
+            .first { it !is PsiWhiteSpace }
+    return PsiChildRange(first, last)
+}
 
 // Annotations on labeled expression lies on it's base expression
 public fun JetExpression.getAnnotationEntries(): List<JetAnnotationEntry> {

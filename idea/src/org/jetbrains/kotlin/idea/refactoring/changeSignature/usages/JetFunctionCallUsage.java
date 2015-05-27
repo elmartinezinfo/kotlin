@@ -369,16 +369,16 @@ public class JetFunctionCallUsage extends JetUsageInfo<JetCallElement> {
                 changeArgumentName(argumentNameExpression, parameterInfo);
                 //noinspection ConstantConditions
                 newArgument.replace(oldArgument instanceof JetFunctionLiteralArgument
-                                    ? psiFactory.createArgument(oldArgument.getArgumentExpression())
+                                    ? psiFactory.createArgument(oldArgument.getArgumentExpression(), null, false)
                                     : oldArgument.asElement());
             }
             // TODO: process default arguments in the middle
             else if (parameterInfo.getDefaultValueForCall() == null) {
                 if (parameterInfo.getDefaultValueForParameter() != null) {
-                    JetPsiUtil.deleteElementWithDelimiters(newArgument);
+                    newArgumentList.removeArgument(newArgument);
                 }
                 else {
-                    newArgument.delete();
+                    newArgument.delete(); // keep space between commas
                 }
             }
             else {
@@ -391,8 +391,9 @@ public class JetFunctionCallUsage extends JetUsageInfo<JetCallElement> {
             element.deleteChildRange(KotlinPackage.first(lambdaArguments), KotlinPackage.last(lambdaArguments));
         }
 
+        //TODO: this is not correct!
         JetValueArgument lastArgument = KotlinPackage.lastOrNull(newArgumentList.getArguments());
-        boolean hasTrailingLambdaInArgumentListAfter = lastArgument != null && lastArgument.getArgumentExpression() instanceof JetFunctionLiteralExpression;
+        boolean hasTrailingLambdaInArgumentListAfter = lastArgument != null && PsiPackage.unpackFunctionLiteral(lastArgument.getArgumentExpression()) != null;
 
         arguments = (JetValueArgumentList) arguments.replace(newArgumentList);
 
@@ -430,11 +431,11 @@ public class JetFunctionCallUsage extends JetUsageInfo<JetCallElement> {
         }
 
         if (hasTrailingLambdaInArgumentListAfter) {
-            JetCallElement newCallElement =
-                    (JetCallElement) (newElement instanceof JetQualifiedExpression
+            JetCallExpression newCallExpression =
+                    (JetCallExpression) (newElement instanceof JetQualifiedExpression
                                       ? ((JetQualifiedExpression) newElement).getSelectorExpression()
                                       : newElement);
-            PsiModificationUtilPackage.moveLambdaOutsideParentheses(newCallElement);
+            PsiModificationUtilPackage.moveFunctionLiteralOutsideParentheses(newCallExpression);
         }
     }
 

@@ -844,6 +844,87 @@ public class QuickFixMultiFileTestGenerated extends AbstractQuickFixMultiFileTes
         }
     }
 
+    @TestMetadata("idea/testData/quickfix/deprecatedSymbolUsage")
+    @TestDataPath("$PROJECT_ROOT")
+    @RunWith(JUnit3RunnerWithInners.class)
+    public static class DeprecatedSymbolUsage extends AbstractQuickFixMultiFileTest {
+        public void testAllFilesPresentInDeprecatedSymbolUsage() throws Exception {
+            JetTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/quickfix/deprecatedSymbolUsage"), Pattern.compile("^(\\w+)\\.before\\.Main\\.kt$"), true);
+        }
+
+        @TestMetadata("javaDeprecated.before.Main.kt")
+        public void testJavaDeprecated() throws Exception {
+            String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/deprecatedSymbolUsage/javaDeprecated.before.Main.kt");
+            doTestWithExtraFile(fileName);
+        }
+
+        @TestMetadata("toMethodFromCompanionObject.before.Main.kt")
+        public void testToMethodFromCompanionObject() throws Exception {
+            String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/deprecatedSymbolUsage/toMethodFromCompanionObject.before.Main.kt");
+            doTestWithExtraFile(fileName);
+        }
+
+        @TestMetadata("idea/testData/quickfix/deprecatedSymbolUsage/imports")
+        @TestDataPath("$PROJECT_ROOT")
+        @RunWith(JUnit3RunnerWithInners.class)
+        public static class Imports extends AbstractQuickFixMultiFileTest {
+            @TestMetadata("addImportFromSamePackage.before.Main.kt")
+            public void testAddImportFromSamePackage() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/deprecatedSymbolUsage/imports/addImportFromSamePackage.before.Main.kt");
+                doTestWithExtraFile(fileName);
+            }
+
+            @TestMetadata("addImportFromSamePackage2.before.Main.kt")
+            public void testAddImportFromSamePackage2() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/deprecatedSymbolUsage/imports/addImportFromSamePackage2.before.Main.kt");
+                doTestWithExtraFile(fileName);
+            }
+
+            @TestMetadata("addImportFromSamePackage3.before.Main.kt")
+            public void testAddImportFromSamePackage3() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/deprecatedSymbolUsage/imports/addImportFromSamePackage3.before.Main.kt");
+                doTestWithExtraFile(fileName);
+            }
+
+            @TestMetadata("addImports.before.Main.kt")
+            public void testAddImports() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/deprecatedSymbolUsage/imports/addImports.before.Main.kt");
+                doTestWithExtraFile(fileName);
+            }
+
+            public void testAllFilesPresentInImports() throws Exception {
+                JetTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/quickfix/deprecatedSymbolUsage/imports"), Pattern.compile("^(\\w+)\\.before\\.Main\\.kt$"), true);
+            }
+
+            @TestMetadata("rootPackage.before.Main.kt")
+            public void testRootPackage() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/deprecatedSymbolUsage/imports/rootPackage.before.Main.kt");
+                doTestWithExtraFile(fileName);
+            }
+        }
+
+        @TestMetadata("idea/testData/quickfix/deprecatedSymbolUsage/wholeProject")
+        @TestDataPath("$PROJECT_ROOT")
+        @RunWith(JUnit3RunnerWithInners.class)
+        public static class WholeProject extends AbstractQuickFixMultiFileTest {
+            public void testAllFilesPresentInWholeProject() throws Exception {
+                JetTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/quickfix/deprecatedSymbolUsage/wholeProject"), Pattern.compile("^(\\w+)\\.before\\.Main\\.kt$"), true);
+            }
+
+            @TestMetadata("function.before.Main.kt")
+            public void testFunction() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/deprecatedSymbolUsage/wholeProject/function.before.Main.kt");
+                doTestWithExtraFile(fileName);
+            }
+
+            @TestMetadata("property.before.Main.kt")
+            public void testProperty() throws Exception {
+                String fileName = JetTestUtils.navigationMetadata("idea/testData/quickfix/deprecatedSymbolUsage/wholeProject/property.before.Main.kt");
+                doTestWithExtraFile(fileName);
+            }
+        }
+    }
+
     @TestMetadata("idea/testData/quickfix/migration")
     @TestDataPath("$PROJECT_ROOT")
     @RunWith(JUnit3RunnerWithInners.class)

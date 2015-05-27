@@ -200,8 +200,8 @@ private fun addDebugExpressionBeforeContextElement(codeFragment: JetCodeFragment
                 }
             }
         }
-        contextElement is JetClassOrObject -> {
-            insertNewInitializer(contextElement.getBody())
+        contextElement is JetClassOrObject && contextElement.getBody() != null -> {
+            insertNewInitializer(contextElement.getBody()!!)
         }
         contextElement is JetFunctionLiteral -> {
             val block = contextElement.getBodyExpression()!!

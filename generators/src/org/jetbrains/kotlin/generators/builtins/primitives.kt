@@ -52,14 +52,10 @@ class GeneratePrimitives(out: PrintWriter) : BuiltInsSourceGenerator(out) {
     )
 
     override fun generateBody() {
-        for (kind in PrimitiveType.exceptBoolean) {
+        for (kind in PrimitiveType.onlyNumeric) {
             val className = kind.capitalized
             generateDoc(kind)
-            out.print("public class $className private () : ")
-            if (kind != PrimitiveType.CHAR) {
-                out.print("Number, ")
-            }
-            out.println("Comparable<$className> {")
+            out.println("public class $className private () : Number, Comparable<$className> {")
 
             out.print("    companion object")
             if (kind == PrimitiveType.FLOAT || kind == PrimitiveType.DOUBLE) {
@@ -96,9 +92,7 @@ class GeneratePrimitives(out: PrintWriter) : BuiltInsSourceGenerator(out) {
     private fun generateCompareTo(thisKind: PrimitiveType) {
         for (otherKind in PrimitiveType.exceptBoolean) {
             out.println("/**")
-            if (thisKind == PrimitiveType.CHAR && otherKind != PrimitiveType.CHAR) {
-                out.println(" * Compares the character code of this character with the specified value for order.")
-            } else if (thisKind != PrimitiveType.CHAR && otherKind == PrimitiveType.CHAR) {
+            if (otherKind == PrimitiveType.CHAR) {
                 out.println(" * Compares this value with the character code of the specified character for order.")
             } else {
                 out.println(" * Compares this value with the specified value for order.")
@@ -106,6 +100,8 @@ class GeneratePrimitives(out: PrintWriter) : BuiltInsSourceGenerator(out) {
             out.println(" * Returns zero if this value is equal to the specified other value, a negative number if its less than other, ")
             out.println(" * or a positive number if its greater than other.")
             out.println(" */")
+            if (otherKind == PrimitiveType.CHAR)
+                out.println("""    deprecated("This operation doesn't make sense and shall be removed in M13. Consider converting Char operand to Int.")""")
             out.print("    public ")
             if (otherKind == thisKind) out.print("override ")
             out.println("fun compareTo(other: ${otherKind.capitalized}): Int")
@@ -121,26 +117,22 @@ class GeneratePrimitives(out: PrintWriter) : BuiltInsSourceGenerator(out) {
 
     private fun generateOperator(name: String, doc: String, thisKind: PrimitiveType) {
         for (otherKind in PrimitiveType.exceptBoolean) {
-            if (thisKind == PrimitiveType.CHAR && otherKind == PrimitiveType.CHAR && name != "minus") {
-                continue
-            }
             val returnType = getOperatorReturnType(thisKind, otherKind)
             out.println("    /** $doc */")
+            if (otherKind == PrimitiveType.CHAR)
+                out.println("""    deprecated("This operation doesn't make sense and shall be removed in M13. Consider converting Char operand to Int.")""")
             out.println("    public fun $name(other: ${otherKind.capitalized}): $returnType")
         }
         out.println()
     }
 
     private fun generateRangeTo(thisKind: PrimitiveType) {
-        if (thisKind == PrimitiveType.CHAR) {
+        for (otherKind in PrimitiveType.exceptBoolean) {
+            val returnType = if (otherKind.ordinal() > thisKind.ordinal()) otherKind else thisKind
             out.println("     /** Creates a range from this value to the specified [other] value. */")
-            out.println("    public fun rangeTo(other: Char): CharRange")
-        } else {
-            for (otherKind in PrimitiveType.exceptBoolean) {
-                val returnType = if (otherKind.ordinal() > thisKind.ordinal()) otherKind else thisKind
-                out.println("     /** Creates a range from this value to the specified [other] value. */")
-                out.println("    public fun rangeTo(other: ${otherKind.capitalized}): ${returnType.capitalized}Range")
-            }
+            if (otherKind == PrimitiveType.CHAR)
+                out.println("""    deprecated("This operation doesn't make sense and shall be removed in M13. Consider converting Char operand to Int.")""")
+            out.println("    public fun rangeTo(other: ${otherKind.capitalized}): ${returnType.capitalized}Range")
         }
         out.println()
 
@@ -173,9 +165,6 @@ class GeneratePrimitives(out: PrintWriter) : BuiltInsSourceGenerator(out) {
     private fun generateConversions(kind: PrimitiveType) {
         for (otherKind in PrimitiveType.exceptBoolean) {
             val name = otherKind.capitalized
-            if (kind == PrimitiveType.CHAR) {  // Char is not a Number and does not inherit Number's javadocs
-                out.println("    /** Returns the value of this character as a `$name`. */")
-            }
             out.println("    public override fun to$name(): $name")
         }
     }

@@ -281,6 +281,12 @@ public class KeywordCompletionTestGenerated extends AbstractKeywordCompletionTes
         doTest(fileName);
     }
 
+    @TestMetadata("NoCompanionThis.kt")
+    public void testNoCompanionThis() throws Exception {
+        String fileName = JetTestUtils.navigationMetadata("idea/idea-completion/testData/keywords/NoCompanionThis.kt");
+        doTest(fileName);
+    }
+
     @TestMetadata("NoCompletionForCapitalPrefix.kt")
     public void testNoCompletionForCapitalPrefix() throws Exception {
         String fileName = JetTestUtils.navigationMetadata("idea/idea-completion/testData/keywords/NoCompletionForCapitalPrefix.kt");
@@ -392,6 +398,12 @@ public class KeywordCompletionTestGenerated extends AbstractKeywordCompletionTes
     @TestMetadata("Return9.kt")
     public void testReturn9() throws Exception {
         String fileName = JetTestUtils.navigationMetadata("idea/idea-completion/testData/keywords/Return9.kt");
+        doTest(fileName);
+    }
+
+    @TestMetadata("ReturnKeywordName.kt")
+    public void testReturnKeywordName() throws Exception {
+        String fileName = JetTestUtils.navigationMetadata("idea/idea-completion/testData/keywords/ReturnKeywordName.kt");
         doTest(fileName);
     }
 

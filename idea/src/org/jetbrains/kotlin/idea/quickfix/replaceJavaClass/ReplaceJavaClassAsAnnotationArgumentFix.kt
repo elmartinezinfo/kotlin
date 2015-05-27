@@ -47,12 +47,10 @@ public class ReplaceJavaClassAsAnnotationArgumentFix(
                 diagnostic.createIntentionForFirstParentOfType(::ReplaceJavaClassAsAnnotationArgumentFix)
 
         public fun createWholeProjectFixFactory(): JetSingleIntentionActionFactory = createIntentionFactory {
-            JetWholeProjectForEachElementOfTypeFix.createForMultiTask<JetAnnotationEntry, ReplacementTask>(
+            JetWholeProjectForEachElementOfTypeFix.createForMultiTaskOnElement<JetAnnotationEntry, ReplacementTask>(
                     tasksFactory = { createReplacementTasks(it) },
                     tasksProcessor = ::processTasks,
-                    modalTitle = JetBundle.message("replace.java.class.argument.in.whole.project.modal.title"),
-                    name = JetBundle.message("replace.java.class.argument.in.whole.project"),
-                    familyName = JetBundle.message("replace.java.class.argument.in.whole.project.family")
+                    name = "Replace javaClass<T>() with T::class in whole project"
             )
         }
     }

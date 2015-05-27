@@ -18,25 +18,99 @@ package org.jetbrains.kotlin.psi
 
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.SmartPointerManager
 import com.intellij.psi.SmartPsiElementPointer
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.psi.impl.source.codeStyle.CodeEditUtil
+import org.jetbrains.kotlin.lexer.JetTokens
+import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.name.renderName
+import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange
 import org.jetbrains.kotlin.psi.psiUtil.endOffset
 import org.jetbrains.kotlin.psi.psiUtil.parents
 import org.jetbrains.kotlin.psi.psiUtil.startOffset
-import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.LinkedHashMap
 
-public fun JetPsiFactory.createExpressionByPattern(pattern: String, vararg args: Any): JetExpression {
+public fun JetPsiFactory.createExpressionByPattern(pattern: String, vararg args: Any): JetExpression
+        = createByPattern(pattern, *args) { createExpression(it) }
+
+public fun <TDeclaration : JetDeclaration> JetPsiFactory.createDeclarationByPattern(pattern: String, vararg args: Any): TDeclaration
+        = createByPattern(pattern, *args) { createDeclaration<TDeclaration>(it) }
+
+private abstract class ArgumentType<T : Any>(val klass: Class<T>)
+
+private class PlainTextArgumentType<T : Any>(klass: Class<T>, val toPlainText: (T) -> String) : ArgumentType<T>(klass)
+
+private abstract class PsiElementPlaceholderArgumentType<T : Any, TPlaceholder : PsiElement>(klass: Class<T>, val placeholderClass: Class<TPlaceholder>) : ArgumentType<T>(klass) {
+    abstract fun replacePlaceholderElement(placeholder: TPlaceholder, argument: T)
+}
+
+private class PsiElementArgumentType<T : PsiElement>(klass: Class<T>) : PsiElementPlaceholderArgumentType<T, T>(klass, klass) {
+    override fun replacePlaceholderElement(placeholder: T, argument: T) {
+        // if argument element has generated flag then it has not been formatted yet and we should do this manually
+        // (because we cleared this flag for the whole tree above and PostprocessReformattingAspect won't format anything)
+        val reformat = CodeEditUtil.isNodeGenerated(argument.getNode())
+        val result = placeholder.replace(argument)
+        if (reformat) {
+            CodeStyleManager.getInstance(result.getProject()).reformat(result, true)
+        }
+    }
+}
+
+private object PsiChildRangeArgumentType : PsiElementPlaceholderArgumentType<PsiChildRange, JetElement>(javaClass(), javaClass()) {
+    override fun replacePlaceholderElement(placeholder: JetElement, argument: PsiChildRange) {
+        val project = placeholder.getProject()
+        val codeStyleManager = CodeStyleManager.getInstance(project)
+
+        if (argument.isEmpty) {
+            placeholder.delete()
+        }
+        else {
+            val first = placeholder.getParent().addRangeBefore(argument.first!!, argument.last!!, placeholder)
+            val last = placeholder.getPrevSibling()
+            placeholder.delete()
+
+            codeStyleManager.reformatNewlyAddedElement(first.getNode().getTreeParent(), first.getNode())
+            if (last != first) {
+                codeStyleManager.reformatNewlyAddedElement(last.getNode().getTreeParent(), last.getNode())
+            }
+        }
+    }
+}
+
+private val SUPPORTED_ARGUMENT_TYPES = listOf(
+        PsiElementArgumentType<JetExpression>(javaClass()),
+        PsiElementArgumentType<JetTypeReference>(javaClass()),
+        PlainTextArgumentType<String>(javaClass(), toPlainText = { it }),
+        PlainTextArgumentType<Name>(javaClass(), toPlainText = { it.renderName() }),
+        PsiChildRangeArgumentType
+)
+
+public fun <TElement : JetElement> createByPattern(pattern: String, vararg args: Any, factory: (String) -> TElement): TElement {
+    val argumentTypes = args.map { arg ->
+        SUPPORTED_ARGUMENT_TYPES.firstOrNull { it.klass.isInstance(arg) }
+            ?: throw IllegalArgumentException("Unsupported argument type: ${arg.javaClass}, should be one of: ${SUPPORTED_ARGUMENT_TYPES.map { it.klass.getSimpleName() }.joinToString()}")
+    }
+
+    // convert arguments that can be converted into plain text
+    @suppress("NAME_SHADOWING")
+    val args = args.zip(argumentTypes).map {
+        val (arg, type) = it
+        if (type is PlainTextArgumentType)
+            (type.toPlainText as Function1<in Any, String>).invoke(arg) // TODO: see KT-7833
+        else
+            arg
+    }
+
     val (processedText, allPlaceholders) = processPattern(pattern, args)
 
-    var expression = createExpression(processedText)
-    val project = expression.getProject()
+    var resultElement = factory(processedText.trim())
+    val project = resultElement.getProject()
 
-    val start = expression.startOffset
+    val start = resultElement.startOffset
 
     val pointerManager = SmartPointerManager.getInstance(project)
 
@@ -44,15 +118,12 @@ public fun JetPsiFactory.createExpressionByPattern(pattern: String, vararg args:
 
     PlaceholdersLoop@
     for ((n, placeholders) in allPlaceholders) {
-        val expectedElementType = when (args[n]) {
-            is String -> continue@PlaceholdersLoop // already in the text
-            is JetExpression -> javaClass<JetExpression>()
-            is JetTypeReference -> javaClass<JetTypeReference>()
-            else -> throw IllegalArgumentException("Unknown argument ${args[n]} - should be JetExpression, JetTypeReference or String")
-        }
+        val arg = args[n]
+        if (arg is String) continue // already in the text
+        val expectedElementType = (argumentTypes[n] as PsiElementPlaceholderArgumentType<*, *>).placeholderClass
 
         for ((range, text) in placeholders) {
-            val token = expression.findElementAt(range.getStartOffset())!!
+            val token = resultElement.findElementAt(range.getStartOffset())!!
             for (element in token.parents()) {
                 val elementRange = element.getTextRange().shiftRight(-start)
                 if (elementRange == range && expectedElementType.isInstance(element)) {
@@ -79,36 +150,39 @@ public fun JetPsiFactory.createExpressionByPattern(pattern: String, vararg args:
 
     // reformat whole text except for String arguments (as they can contain user's formatting to be preserved)
     if (stringPlaceholderRanges.none()) {
-        expression = codeStyleManager.reformat(expression, true) as JetExpression
+        resultElement = codeStyleManager.reformat(resultElement, true) as TElement
     }
     else {
-        var bound = expression.endOffset - 1
+        var bound = resultElement.endOffset - 1
         for (range in stringPlaceholderRanges) {
             // we extend reformatting range by 1 to the right because otherwise some of spaces are not reformatted
-            expression = codeStyleManager.reformatRange(expression, range.getEndOffset() + start, bound + 1, true) as JetExpression
+            resultElement = codeStyleManager.reformatRange(resultElement, range.getEndOffset() + start, bound + 1, true) as TElement
             bound = range.getStartOffset() + start
         }
-        expression = codeStyleManager.reformatRange(expression, start, bound + 1, true) as JetExpression
+        resultElement = codeStyleManager.reformatRange(resultElement, start, bound + 1, true) as TElement
     }
 
     // do not reformat the whole expression in PostprocessReformattingAspect
-    CodeEditUtil.setNodeGeneratedRecursively(expression.getNode(), false)
+    CodeEditUtil.setNodeGeneratedRecursively(resultElement.getNode(), false)
 
     for ((pointer, n) in pointers) {
-        val element = pointer.getElement()!!
-        element.replace(args[n] as PsiElement)
+        var element = pointer.getElement()!!
+        if (element is JetFunctionLiteral) {
+            element = element.getParent() as JetFunctionLiteralExpression
+        }
+        (argumentTypes[n] as PsiElementPlaceholderArgumentType<in Any, in PsiElement>).replacePlaceholderElement(element, args[n])
     }
 
-    codeStyleManager.adjustLineIndent(expression.getContainingFile(), expression.getTextRange())
+    codeStyleManager.adjustLineIndent(resultElement.getContainingFile(), resultElement.getTextRange())
 
-    return expression
+    return resultElement
 }
 
 private data class Placeholder(val range: TextRange, val text: String)
 
 private data class PatternData(val processedText: String, val placeholders: Map<Int, List<Placeholder>>)
 
-private fun processPattern(pattern: String, args: Array<out Any>): PatternData {
+private fun processPattern(pattern: String, args: List<Any>): PatternData {
     val ranges = LinkedHashMap<Int, MutableList<Placeholder>>()
 
     fun charOrNull(i: Int) = if (0 <= i && i < pattern.length()) pattern[i] else null
@@ -138,13 +212,13 @@ private fun processPattern(pattern: String, args: Array<out Any>): PatternData {
                     i = lastIndex
 
                     val arg: Any? = if (n < args.size()) args[n] else null /* report wrong number of arguments later */
-                    val placeholderText = if (charOrNull(i) != '=') {
+                    val placeholderText = if (charOrNull(i) != ':' || charOrNull(i + 1) != '\'') {
                         if (arg is String) arg else "xyz"
                     }
                     else {
-                        check(arg !is String, "do not specify placeholder text for $$n - String argument passed")
-                        i++
-                        val endIndex = pattern.indexOf('$', i)
+                        check(arg !is String, "do not specify placeholder text for $$n - plain text argument passed")
+                        i += 2 // skip ':' and '\''
+                        val endIndex = pattern.indexOf('\'', i)
                         check(endIndex >= 0, "unclosed placeholder text")
                         check(endIndex > i, "empty placeholder text")
                         val text = pattern.substring(i, endIndex)
@@ -165,9 +239,11 @@ private fun processPattern(pattern: String, args: Array<out Any>): PatternData {
         }
     }.toString()
 
-    val max = ranges.keySet().max()!!
-    for (i in 0..max) {
-        check(ranges.contains(i), "no '$$i' placeholder")
+    if (!ranges.isEmpty()) {
+        val max = ranges.keySet().max()!!
+        for (i in 0..max) {
+            check(ranges.contains(i), "no '$$i' placeholder")
+        }
     }
 
     if (args.size() != ranges.size()) {
@@ -177,22 +253,22 @@ private fun processPattern(pattern: String, args: Array<out Any>): PatternData {
     return PatternData(text, ranges)
 }
 
-public class ExpressionBuilder {
+public class BuilderByPattern<TElement> {
     private val patternBuilder = StringBuilder()
     private val arguments = ArrayList<Any>()
 
-    public fun appendFixedText(text: String): ExpressionBuilder {
+    public fun appendFixedText(text: String): BuilderByPattern<TElement> {
         patternBuilder.append(text)
         return this
     }
 
-    public fun appendNonFormattedText(text: String): ExpressionBuilder {
+    public fun appendNonFormattedText(text: String): BuilderByPattern<TElement> {
         patternBuilder.append("$" + arguments.size())
         arguments.add(text)
         return this
     }
 
-    public fun appendExpression(expression: JetExpression?): ExpressionBuilder {
+    public fun appendExpression(expression: JetExpression?): BuilderByPattern<TElement> {
         if (expression != null) {
             patternBuilder.append("$" + arguments.size())
             arguments.add(expression)
@@ -200,7 +276,7 @@ public class ExpressionBuilder {
         return this
     }
 
-    public fun appendTypeReference(typeRef: JetTypeReference?): ExpressionBuilder {
+    public fun appendTypeReference(typeRef: JetTypeReference?): BuilderByPattern<TElement> {
         if (typeRef != null) {
             patternBuilder.append("$" + arguments.size())
             arguments.add(typeRef)
@@ -208,13 +284,23 @@ public class ExpressionBuilder {
         return this
     }
 
-    public fun createExpression(factory: JetPsiFactory): JetExpression {
-        return factory.createExpressionByPattern(patternBuilder.toString(), *arguments.toArray())
+    public fun appendName(name: Name): BuilderByPattern<TElement> {
+        patternBuilder.append("$" + arguments.size())
+        arguments.add(name)
+        return this
+    }
+
+    public fun create(factory: (String, Array<out Any>) -> TElement): TElement {
+        return factory(patternBuilder.toString(), arguments.toArray())
     }
 }
 
-public fun JetPsiFactory.buildExpression(build: ExpressionBuilder.() -> Unit): JetExpression {
-    val builder = ExpressionBuilder()
+public fun JetPsiFactory.buildExpression(build: BuilderByPattern<JetExpression>.() -> Unit): JetExpression {
+    return buildByPattern({ pattern, args -> this.createExpressionByPattern(pattern, *args) }, build)
+}
+
+public fun <TElement> buildByPattern(factory: (String, Array<out Any>) -> TElement, build: BuilderByPattern<TElement>.() -> Unit): TElement {
+    val builder = BuilderByPattern<TElement>()
     builder.build()
-    return builder.createExpression(this)
+    return builder.create(factory)
 }

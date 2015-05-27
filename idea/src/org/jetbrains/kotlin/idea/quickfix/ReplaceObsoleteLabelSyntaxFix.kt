@@ -50,12 +50,10 @@ public class ReplaceObsoleteLabelSyntaxFix(element: JetAnnotationEntry?) : JetIn
             if (!(diagnostic.getPsiElement().getNonStrictParentOfType<JetAnnotationEntry>()?.looksLikeObsoleteLabelWithReferencesInCode()
                 ?: false)) return@factory null
 
-            JetWholeProjectForEachElementOfTypeFix.createForMultiTask<JetAnnotatedExpression, JetAnnotationEntry>(
+            JetWholeProjectForEachElementOfTypeFix.createForMultiTaskOnElement<JetAnnotatedExpression, JetAnnotationEntry>(
                     tasksFactory = { collectTasks(it) },
                     tasksProcessor ={ it.forEach { ann -> replaceWithLabel(ann) } },
-                    modalTitle = "Replacing labels with obsolete syntax",
-                    name = "Update obsolete label syntax in whole project",
-                    familyName = "Update obsolete label syntax in whole project"
+                    name = "Update obsolete label syntax in whole project"
             )
         }
 
@@ -96,7 +94,7 @@ public class ReplaceObsoleteLabelSyntaxFix(element: JetAnnotationEntry?) : JetIn
             val textRangeToRetain = TextRange(annotation.getTextRange().getEndOffset(), baseExpressionStart)
             val textToRetain = textRangeToRetain.substring(annotation.getContainingFile().getText())
 
-            val labeledExpression = JetPsiFactory(annotation).createExpressionByPattern("$labelName@$0$1", textToRetain, expression)
+            val labeledExpression = JetPsiFactory(annotation).createExpressionByPattern("$0@$1$2", labelName, textToRetain, expression)
 
             annotatedExpression.replace(labeledExpression)
         }

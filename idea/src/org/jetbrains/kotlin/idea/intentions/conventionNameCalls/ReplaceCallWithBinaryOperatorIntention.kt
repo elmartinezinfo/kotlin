@@ -16,12 +16,10 @@
 
 package org.jetbrains.kotlin.idea.intentions.conventionNameCalls
 
+import com.intellij.codeInsight.intention.HighPriorityAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.util.TextRange
-import org.jetbrains.kotlin.idea.intentions.JetSelfTargetingRangeIntention
-import org.jetbrains.kotlin.idea.intentions.callExpression
-import org.jetbrains.kotlin.idea.intentions.calleeName
-import org.jetbrains.kotlin.idea.intentions.toResolvedCall
+import org.jetbrains.kotlin.idea.intentions.*
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.JetDotQualifiedExpression
 import org.jetbrains.kotlin.psi.JetPsiFactory
@@ -29,14 +27,18 @@ import org.jetbrains.kotlin.psi.createExpressionByPattern
 import org.jetbrains.kotlin.resolve.calls.model.ArgumentMatch
 import org.jetbrains.kotlin.types.expressions.OperatorConventions
 
-public class ReplaceCallWithBinaryOperatorIntention : JetSelfTargetingRangeIntention<JetDotQualifiedExpression>(javaClass(), "Replace call with binary operator") {
+public class ReplaceCallWithBinaryOperatorIntention : JetSelfTargetingRangeIntention<JetDotQualifiedExpression>(javaClass(), "Replace call with binary operator"), HighPriorityAction {
     override fun applicabilityRange(element: JetDotQualifiedExpression): TextRange? {
         val operation = operation(element.calleeName) ?: return null
+
         val resolvedCall = element.toResolvedCall() ?: return null
         if (!resolvedCall.getStatus().isSuccess()) return null
         if (resolvedCall.getCall().getTypeArgumentList() != null) return null
         val argument = resolvedCall.getCall().getValueArguments().singleOrNull() ?: return null
         if ((resolvedCall.getArgumentMapping(argument) as ArgumentMatch).valueParameter.getIndex() != 0) return null
+
+        if (!element.isReceiverExpressionWithValue()) return null
+
         setText("Replace with '$operation' operator")
         return element.callExpression!!.getCalleeExpression()!!.getTextRange()
     }

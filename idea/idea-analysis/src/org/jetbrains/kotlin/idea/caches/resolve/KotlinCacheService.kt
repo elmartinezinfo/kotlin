@@ -33,11 +33,9 @@ import org.jetbrains.kotlin.idea.project.TargetPlatform.JS
 import org.jetbrains.kotlin.idea.project.TargetPlatform.JVM
 import org.jetbrains.kotlin.idea.project.TargetPlatformDetector
 import org.jetbrains.kotlin.idea.util.ProjectRootsUtil
-import org.jetbrains.kotlin.psi.JetCodeFragment
-import org.jetbrains.kotlin.psi.JetDeclaration
-import org.jetbrains.kotlin.psi.JetElement
-import org.jetbrains.kotlin.psi.JetFile
-import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.resolve.*
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 import org.jetbrains.kotlin.resolve.scopes.JetScope
 import org.jetbrains.kotlin.utils.keysToMap
@@ -71,6 +69,16 @@ public class KotlinCacheService(val project: Project) {
 
             override fun getFileTopLevelScope(file: JetFile): JetScope {
                 return cache.getLazyResolveSession(file).getScopeProvider().getFileScope(file)
+            }
+
+            override fun resolveImportReference(file: JetFile, fqName: FqName, isDefaultImport: Boolean): Collection<DeclarationDescriptor> {
+                val importDirective = JetPsiFactory(project).createImportDirective(ImportPath(fqName, false))
+                val moduleDescriptor = findModuleDescriptor(file)
+                val resolveSession = cache.getLazyResolveSession(file)
+                val scope = JetModuleUtil.getImportsResolutionScope(moduleDescriptor, !isDefaultImport)
+                val resolver = resolveSession.getQualifiedExpressionResolver()
+                return resolver.processImportReference(
+                        importDirective, scope, scope, BindingTraceContext(), QualifiedExpressionResolver.LookupMode.EVERYTHING).getAllDescriptors()
             }
 
             override fun <T> get(extension: CacheExtension<T>): T {

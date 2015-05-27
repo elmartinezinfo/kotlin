@@ -144,7 +144,6 @@ class Kotlin2JvmSourceSetProcessor(
         val javaTask = project.getTasks().findByName(sourceSet.getCompileJavaTaskName()) as AbstractCompile?
 
         if (javaTask != null) {
-            kotlinTask.getExtensions().getExtraProperties().set("javaTask", WeakReference(javaTask))
             javaTask.dependsOn(kotlinTaskName)
             val javacClassPath = javaTask.getClasspath() + project.files(kotlinDestinationDir);
             javaTask.setClasspath(javacClassPath)
@@ -168,11 +167,16 @@ class Kotlin2JvmSourceSetProcessor(
                 if (aptConfiguration.getDependencies().size() > 1 && javaTask is JavaCompile) {
                     val (aptOutputDir, aptWorkingDir) = project.getAptDirsForSourceSet(kotlinTask, sourceSet.getName())
 
-                    val kaptManager = AnnotationProcessingManager(kotlinTask, javaTask, aptConfiguration.resolve(), aptOutputDir, aptWorkingDir)
+                    val kaptManager = AnnotationProcessingManager(kotlinTask, javaTask, sourceSet.getName(),
+                            aptConfiguration.resolve(), aptOutputDir, aptWorkingDir)
                     kotlinTask.storeKaptAnnotationsFile(kaptManager)
 
                     javaTask.doFirst {
                         kaptManager.setupKapt()
+                    }
+
+                    javaTask.doLast {
+                        kaptManager.afterJavaCompile()
                     }
                 }
             }
@@ -365,7 +369,7 @@ open class KotlinAndroidPlugin [Inject] (val scriptHandler: ScriptHandler, val t
             val variantDataName = variantData.getName()
             logger.kotlinDebug("Process variant [$variantDataName]")
 
-            val javaTask = variantData.javaCompileTask
+            val javaTask = AndroidGradleWrapper.getJavaCompile(variantData)
 
             val kotlinTaskName = "compile${variantDataName.capitalize()}Kotlin"
             val kotlinTask = tasksProvider.createKotlinJVMTask(project, kotlinTaskName)
@@ -432,12 +436,21 @@ open class KotlinAndroidPlugin [Inject] (val scriptHandler: ScriptHandler, val t
 
             javaTask.dependsOn(kotlinTaskName)
 
-            val kaptManager = AnnotationProcessingManager(kotlinTask, javaTask, aptFiles.toSet(), aptOutputDir, aptWorkingDir)
-            kotlinTask.storeKaptAnnotationsFile(kaptManager)
+            val kaptManager = if (javaTask is JavaCompile && aptFiles.isNotEmpty()) {
+                val manager = AnnotationProcessingManager(kotlinTask, javaTask, variantDataName,
+                        aptFiles.toSet(), aptOutputDir, aptWorkingDir)
+                kotlinTask.storeKaptAnnotationsFile(manager)
+                manager
+            }
+            else null
 
             javaTask doFirst {
                 javaTask.setClasspath(javaTask.getClasspath() + project.files(kotlinTask.property("kotlinDestinationDir")))
-                kaptManager.setupKapt()
+                kaptManager?.setupKapt()
+            }
+
+            javaTask doLast {
+                kaptManager?.afterJavaCompile()
             }
         }
     }

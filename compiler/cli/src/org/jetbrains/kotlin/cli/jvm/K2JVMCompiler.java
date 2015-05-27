@@ -62,7 +62,7 @@ public class K2JVMCompiler extends CLICompiler<K2JVMCompilerArguments> {
     protected ExitCode doExecute(
             @NotNull K2JVMCompilerArguments arguments,
             @NotNull Services services,
-            @NotNull MessageCollector messageCollector,
+            @NotNull MessageSeverityCollector messageCollector,
             @NotNull Disposable rootDisposable
     ) {
         KotlinPaths paths = arguments.kotlinHome != null
@@ -188,6 +188,16 @@ public class K2JVMCompiler extends CLICompiler<K2JVMCompilerArguments> {
             else {
                 KotlinCoreEnvironment environment =
                         KotlinCoreEnvironment.createForProduction(rootDisposable, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES);
+
+                if (messageCollector.anyReported(CompilerMessageSeverity.ERROR)) {
+                    return INTERNAL_ERROR;
+                }
+
+                if (environment.getSourceFiles().isEmpty()) {
+                    messageCollector.report(CompilerMessageSeverity.ERROR, "No source files", CompilerMessageLocation.NO_LOCATION);
+                    return INTERNAL_ERROR;
+                }
+
                 KotlinToJVMBytecodeCompiler.compileBunchOfSources(environment, jar, outputDir, arguments.includeRuntime);
             }
             return OK;

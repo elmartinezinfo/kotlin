@@ -166,7 +166,7 @@ public abstract class CLICompiler<A extends CommonCompilerArguments> {
     protected abstract ExitCode doExecute(
             @NotNull A arguments,
             @NotNull Services services,
-            @NotNull MessageCollector messageCollector,
+            @NotNull MessageSeverityCollector messageCollector,
             @NotNull Disposable rootDisposable
     );
 

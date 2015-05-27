@@ -79,7 +79,7 @@ public enum class RegexOption(override val value: Int, override val mask: Int = 
  * @param value The value of captured group.
  * @param range The range of indices in the input string where group was captured.
  *
- * The [range] property is available on JVM only
+ * The [range] property is available on JVM only.
  */
 public data class MatchGroup(public val value: String, public val range: IntRange)
 
@@ -173,9 +173,10 @@ public class Regex internal (private val nativePattern: Pattern) {
 
 
     /**
-     * Splits this string around matches of the given regular expression.
+     * Splits the [input] CharSequence around matches of this regular expression.
      *
-     * @param limit The maximum number of times the split can occur.
+     * @param limit Non-negative value specifying the maximum number of substrings the string can be split to.
+     * Zero by default means no limit is set.
      */
     public fun split(input: CharSequence, limit: Int = 0): List<String> {
         require(limit >= 0, { "Limit must be non-negative, but was $limit" } )

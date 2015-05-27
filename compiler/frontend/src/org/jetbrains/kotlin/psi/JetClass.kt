@@ -39,20 +39,6 @@ public open class JetClass : JetClassOrObject {
         return visitor.visitClass(this, data)
     }
 
-    public fun getPrimaryConstructor(): JetPrimaryConstructor? {
-        return getStubOrPsiChild(JetStubElementTypes.PRIMARY_CONSTRUCTOR)
-    }
-
-    public fun getPrimaryConstructorParameterList(): JetParameterList? {
-        val primaryConstructor = getPrimaryConstructor()
-        return primaryConstructor?.getValueParameterList()
-    }
-
-    public fun getPrimaryConstructorParameters(): List<JetParameter> {
-        val list = getPrimaryConstructorParameterList() ?: return emptyList<JetParameter>()
-        return list.getParameters()
-    }
-
     public fun createPrimaryConstructorIfAbsent(): JetPrimaryConstructor {
         val constructor = getPrimaryConstructor()
         if (constructor != null) return constructor
@@ -69,23 +55,9 @@ public open class JetClass : JetClassOrObject {
         return constructor.add(JetPsiFactory(getProject()).createParameterList("()")) as JetParameterList
     }
 
-    public fun getPrimaryConstructorModifierList(): JetModifierList? {
-        val primaryConstructor = getPrimaryConstructor()
-        return primaryConstructor?.getModifierList()
-    }
-
-    public fun hasExplicitPrimaryConstructor(): Boolean {
-        return getPrimaryConstructor() != null
-    }
 
     public fun getColon(): PsiElement? {
         return findChildByType(JetTokens.COLON)
-    }
-
-    public fun getProperties(): List<JetProperty> {
-        val body = getBody() ?: return emptyList<JetProperty>()
-
-        return body.getProperties()
     }
 
     public fun isInterface(): Boolean {
@@ -149,18 +121,6 @@ public open class JetClass : JetClassOrObject {
         return body.getAllCompanionObjects()
     }
 
-    public fun hasPrimaryConstructor(): Boolean {
-        return hasExplicitPrimaryConstructor() || !hasSecondaryConstructors()
-    }
-
-    private fun hasSecondaryConstructors(): Boolean {
-        return !getSecondaryConstructors().isEmpty()
-    }
-
-    public fun getSecondaryConstructors(): List<JetSecondaryConstructor> {
-        val body = getBody()
-        return if (body != null) body.getSecondaryConstructors() else emptyList<JetSecondaryConstructor>()
-    }
 
     public fun getClassOrInterfaceKeyword(): PsiElement? {
         return findChildByType(TokenSet.create(JetTokens.CLASS_KEYWORD, JetTokens.INTERFACE_KEYWORD))

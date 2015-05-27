@@ -29,7 +29,6 @@ abstract public class JetClassOrObject : JetTypeParameterListOwnerStub<KotlinCla
     public constructor(stub: KotlinClassOrObjectStub<out JetClassOrObject>, nodeType: IStubElementType<*, *>) : super(stub, nodeType)
 
     public fun getDelegationSpecifierList(): JetDelegationSpecifierList? = getStubOrPsiChild(JetStubElementTypes.DELEGATION_SPECIFIER_LIST)
-
     open public fun getDelegationSpecifiers(): List<JetDelegationSpecifier> = getDelegationSpecifierList()?.getDelegationSpecifiers().orEmpty()
 
     public fun getAnonymousInitializers(): List<JetClassInitializer> = getBody()?.getAnonymousInitializers().orEmpty()
@@ -39,9 +38,26 @@ abstract public class JetClassOrObject : JetTypeParameterListOwnerStub<KotlinCla
 
     public fun getBody(): JetClassBody? = getStubOrPsiChild(JetStubElementTypes.CLASS_BODY)
 
-    public fun isTopLevel(): Boolean = getStub()?.isTopLevel() ?: getParent() is JetFile
+    public fun isTopLevel(): Boolean = getStub()?.isTopLevel() ?: (getParent() is JetFile)
 
     public fun isLocal(): Boolean = getStub()?.isLocal() ?: JetPsiUtil.isLocal(this)
     
     override fun getDeclarations() = getBody()?.getDeclarations().orEmpty()
+
+    public fun getPrimaryConstructor(): JetPrimaryConstructor? = getStubOrPsiChild(JetStubElementTypes.PRIMARY_CONSTRUCTOR)
+
+    public fun getPrimaryConstructorModifierList(): JetModifierList? = getPrimaryConstructor()?.getModifierList()
+    public fun getPrimaryConstructorParameterList(): JetParameterList? = getPrimaryConstructor()?.getValueParameterList()
+    public fun getPrimaryConstructorParameters(): List<JetParameter> = getPrimaryConstructorParameterList()?.getParameters().orEmpty()
+
+    public fun hasExplicitPrimaryConstructor(): Boolean = getPrimaryConstructor() != null
+
+    public fun hasPrimaryConstructor(): Boolean = hasExplicitPrimaryConstructor() || !hasSecondaryConstructors()
+    private fun hasSecondaryConstructors(): Boolean = !getSecondaryConstructors().isEmpty()
+
+    public fun getSecondaryConstructors(): List<JetSecondaryConstructor> = getBody()?.getSecondaryConstructors().orEmpty()
+
+    public fun isAnnotation(): Boolean = hasModifier(JetTokens.ANNOTATION_KEYWORD)
+
+    public fun getProperties(): List<JetProperty> = getBody()?.getProperties().orEmpty()
 }

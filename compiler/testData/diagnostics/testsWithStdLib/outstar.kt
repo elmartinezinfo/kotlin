@@ -3,7 +3,7 @@
 import java.util.ArrayList
 
 abstract class J {
-    public abstract fun <T : Collection<S>, S : List<<!UNSUPPORTED_STAR_PROJECTION!>out<!> *>> foo(x: T)
+    public abstract fun <T : Collection<S>, S : List<<!ILLEGAL_MODIFIER!>out<!> *>> foo(x: T)
     fun bar() {
         val s = ArrayList<ArrayList<Int>>()
         foo(s)

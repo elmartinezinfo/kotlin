@@ -11,7 +11,7 @@ import java.util.*
 import java.util.Collections // TODO: it's temporary while we have java.util.Collections in js
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun <T> Array<out T>.asSequence(): Sequence<T> {
     return object : Sequence<T> {
@@ -22,7 +22,7 @@ public fun <T> Array<out T>.asSequence(): Sequence<T> {
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun BooleanArray.asSequence(): Sequence<Boolean> {
     return object : Sequence<Boolean> {
@@ -33,7 +33,7 @@ public fun BooleanArray.asSequence(): Sequence<Boolean> {
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun ByteArray.asSequence(): Sequence<Byte> {
     return object : Sequence<Byte> {
@@ -44,7 +44,7 @@ public fun ByteArray.asSequence(): Sequence<Byte> {
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun CharArray.asSequence(): Sequence<Char> {
     return object : Sequence<Char> {
@@ -55,7 +55,7 @@ public fun CharArray.asSequence(): Sequence<Char> {
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun DoubleArray.asSequence(): Sequence<Double> {
     return object : Sequence<Double> {
@@ -66,7 +66,7 @@ public fun DoubleArray.asSequence(): Sequence<Double> {
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun FloatArray.asSequence(): Sequence<Float> {
     return object : Sequence<Float> {
@@ -77,7 +77,7 @@ public fun FloatArray.asSequence(): Sequence<Float> {
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun IntArray.asSequence(): Sequence<Int> {
     return object : Sequence<Int> {
@@ -88,7 +88,7 @@ public fun IntArray.asSequence(): Sequence<Int> {
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun LongArray.asSequence(): Sequence<Long> {
     return object : Sequence<Long> {
@@ -99,7 +99,7 @@ public fun LongArray.asSequence(): Sequence<Long> {
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun ShortArray.asSequence(): Sequence<Short> {
     return object : Sequence<Short> {
@@ -110,7 +110,7 @@ public fun ShortArray.asSequence(): Sequence<Short> {
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun <T> Iterable<T>.asSequence(): Sequence<T> {
     return object : Sequence<T> {
@@ -121,7 +121,7 @@ public fun <T> Iterable<T>.asSequence(): Sequence<T> {
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun <K, V> Map<K, V>.asSequence(): Sequence<Map.Entry<K, V>> {
     return object : Sequence<Map.Entry<K, V>> {
@@ -132,7 +132,7 @@ public fun <K, V> Map<K, V>.asSequence(): Sequence<Map.Entry<K, V>> {
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun <T> Sequence<T>.asSequence(): Sequence<T> {
     return this
@@ -141,14 +141,14 @@ public fun <T> Sequence<T>.asSequence(): Sequence<T> {
 
 deprecated("Migrate to using Sequence<T> and respective functions")
 /**
- * Returns a stream from the given collection
+ * Returns a stream from the given collection.
  */
 public fun <T> Stream<T>.asStream(): Stream<T> {
     return this
 }
 
 /**
- * Returns a sequence from the given collection
+ * Returns a sequence from the given collection.
  */
 public fun String.asSequence(): Sequence<Char> {
     return object : Sequence<Char> {
@@ -161,7 +161,7 @@ public fun String.asSequence(): Sequence<Char> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun <T> Array<out T>.sequence(): Sequence<T> {
     return asSequence()
 }
@@ -169,7 +169,7 @@ public fun <T> Array<out T>.sequence(): Sequence<T> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun BooleanArray.sequence(): Sequence<Boolean> {
     return asSequence()
 }
@@ -177,7 +177,7 @@ public fun BooleanArray.sequence(): Sequence<Boolean> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun ByteArray.sequence(): Sequence<Byte> {
     return asSequence()
 }
@@ -185,7 +185,7 @@ public fun ByteArray.sequence(): Sequence<Byte> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun CharArray.sequence(): Sequence<Char> {
     return asSequence()
 }
@@ -193,7 +193,7 @@ public fun CharArray.sequence(): Sequence<Char> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun DoubleArray.sequence(): Sequence<Double> {
     return asSequence()
 }
@@ -201,7 +201,7 @@ public fun DoubleArray.sequence(): Sequence<Double> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun FloatArray.sequence(): Sequence<Float> {
     return asSequence()
 }
@@ -209,7 +209,7 @@ public fun FloatArray.sequence(): Sequence<Float> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun IntArray.sequence(): Sequence<Int> {
     return asSequence()
 }
@@ -217,7 +217,7 @@ public fun IntArray.sequence(): Sequence<Int> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun LongArray.sequence(): Sequence<Long> {
     return asSequence()
 }
@@ -225,7 +225,7 @@ public fun LongArray.sequence(): Sequence<Long> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun ShortArray.sequence(): Sequence<Short> {
     return asSequence()
 }
@@ -233,7 +233,7 @@ public fun ShortArray.sequence(): Sequence<Short> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun <T> Iterable<T>.sequence(): Sequence<T> {
     return asSequence()
 }
@@ -241,7 +241,7 @@ public fun <T> Iterable<T>.sequence(): Sequence<T> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun <K, V> Map<K, V>.sequence(): Sequence<Map.Entry<K, V>> {
     return asSequence()
 }
@@ -249,7 +249,7 @@ public fun <K, V> Map<K, V>.sequence(): Sequence<Map.Entry<K, V>> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun <T> Sequence<T>.sequence(): Sequence<T> {
     return this
 }
@@ -258,7 +258,7 @@ public fun <T> Sequence<T>.sequence(): Sequence<T> {
 /**
  * Returns a stream from the given collection
  */
-deprecated("Use asStream() instead")
+deprecated("Use asStream() instead", ReplaceWith("asStream()"))
 public fun <T> Stream<T>.stream(): Stream<T> {
     return this
 }
@@ -266,7 +266,7 @@ public fun <T> Stream<T>.stream(): Stream<T> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun String.sequence(): Sequence<Char> {
     return asSequence()
 }
@@ -274,7 +274,7 @@ public fun String.sequence(): Sequence<Char> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun <T> Array<out T>.stream(): Stream<T> {
     val sequence = asSequence()
     return object : Stream<T> {
@@ -287,7 +287,7 @@ public fun <T> Array<out T>.stream(): Stream<T> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun BooleanArray.stream(): Stream<Boolean> {
     val sequence = asSequence()
     return object : Stream<Boolean> {
@@ -300,7 +300,7 @@ public fun BooleanArray.stream(): Stream<Boolean> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun ByteArray.stream(): Stream<Byte> {
     val sequence = asSequence()
     return object : Stream<Byte> {
@@ -313,7 +313,7 @@ public fun ByteArray.stream(): Stream<Byte> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun CharArray.stream(): Stream<Char> {
     val sequence = asSequence()
     return object : Stream<Char> {
@@ -326,7 +326,7 @@ public fun CharArray.stream(): Stream<Char> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun DoubleArray.stream(): Stream<Double> {
     val sequence = asSequence()
     return object : Stream<Double> {
@@ -339,7 +339,7 @@ public fun DoubleArray.stream(): Stream<Double> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun FloatArray.stream(): Stream<Float> {
     val sequence = asSequence()
     return object : Stream<Float> {
@@ -352,7 +352,7 @@ public fun FloatArray.stream(): Stream<Float> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun IntArray.stream(): Stream<Int> {
     val sequence = asSequence()
     return object : Stream<Int> {
@@ -365,7 +365,7 @@ public fun IntArray.stream(): Stream<Int> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun LongArray.stream(): Stream<Long> {
     val sequence = asSequence()
     return object : Stream<Long> {
@@ -378,7 +378,7 @@ public fun LongArray.stream(): Stream<Long> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun ShortArray.stream(): Stream<Short> {
     val sequence = asSequence()
     return object : Stream<Short> {
@@ -391,7 +391,7 @@ public fun ShortArray.stream(): Stream<Short> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun <T> Iterable<T>.stream(): Stream<T> {
     val sequence = asSequence()
     return object : Stream<T> {
@@ -404,7 +404,7 @@ public fun <T> Iterable<T>.stream(): Stream<T> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun <K, V> Map<K, V>.stream(): Stream<Map.Entry<K, V>> {
     val sequence = asSequence()
     return object : Stream<Map.Entry<K, V>> {
@@ -417,7 +417,7 @@ public fun <K, V> Map<K, V>.stream(): Stream<Map.Entry<K, V>> {
 /**
  * Returns a sequence from the given collection
  */
-deprecated("Use asSequence() instead")
+deprecated("Use asSequence() instead", ReplaceWith("asSequence()"))
 public fun String.stream(): Stream<Char> {
     val sequence = asSequence()
     return object : Stream<Char> {

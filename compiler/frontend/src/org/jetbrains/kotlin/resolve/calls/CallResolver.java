@@ -55,8 +55,8 @@ import java.util.List;
 
 import static org.jetbrains.kotlin.diagnostics.Errors.*;
 import static org.jetbrains.kotlin.resolve.bindingContextUtil.BindingContextUtilPackage.recordScopeAndDataFlowInfo;
-import static org.jetbrains.kotlin.resolve.calls.CallResolverUtil.ResolveArgumentsMode.RESOLVE_FUNCTION_ARGUMENTS;
-import static org.jetbrains.kotlin.resolve.calls.CallResolverUtil.ResolveArgumentsMode.SHAPE_FUNCTION_ARGUMENTS;
+import static org.jetbrains.kotlin.resolve.calls.context.ResolveArgumentsMode.RESOLVE_FUNCTION_ARGUMENTS;
+import static org.jetbrains.kotlin.resolve.calls.context.ResolveArgumentsMode.SHAPE_FUNCTION_ARGUMENTS;
 import static org.jetbrains.kotlin.resolve.calls.results.OverloadResolutionResults.Code.CANDIDATES_WITH_WRONG_RECEIVER;
 import static org.jetbrains.kotlin.resolve.calls.results.OverloadResolutionResults.Code.INCOMPLETE_TYPE_INFERENCE;
 import static org.jetbrains.kotlin.types.TypeUtils.NO_EXPECTED_TYPE;
@@ -148,7 +148,7 @@ public class CallResolver {
             @NotNull JetReferenceExpression functionReference,
             @NotNull Name name
     ) {
-        BasicCallResolutionContext callResolutionContext = BasicCallResolutionContext.create(context, call, CheckValueArgumentsMode.ENABLED);
+        BasicCallResolutionContext callResolutionContext = BasicCallResolutionContext.create(context, call);
         return computeTasksAndResolveCall(
                 callResolutionContext, name, functionReference,
                 CallableDescriptorCollectors.FUNCTIONS_AND_VARIABLES, CallTransformer.FUNCTION_CALL_TRANSFORMER);
@@ -237,7 +237,7 @@ public class CallResolver {
     ) {
         return resolveFunctionCall(
                 BasicCallResolutionContext.create(
-                        trace, scope, call, expectedType, dataFlowInfo, ContextDependency.INDEPENDENT, CheckValueArgumentsMode.ENABLED,
+                        trace, scope, call, expectedType, dataFlowInfo, ContextDependency.INDEPENDENT,
                         additionalCheckerProvider.getCallChecker(), additionalCheckerProvider.getSymbolUsageValidator(),
                         additionalCheckerProvider.getTypeChecker(), isAnnotationContext)
         );
@@ -315,10 +315,8 @@ public class CallResolver {
         // when super call should be conventional enum constructor and super call should be empty
 
         BasicCallResolutionContext context = BasicCallResolutionContext.create(
-                trace, scope,
-                CallMaker.makeCall(ReceiverValue.NO_RECEIVER, null, call),
-                NO_EXPECTED_TYPE,
-                dataFlowInfo, ContextDependency.INDEPENDENT, CheckValueArgumentsMode.ENABLED,
+                trace, scope, CallMaker.makeCall(ReceiverValue.NO_RECEIVER, null, call),
+                NO_EXPECTED_TYPE, dataFlowInfo, ContextDependency.INDEPENDENT,
                 callChecker, additionalCheckerProvider.getSymbolUsageValidator(), additionalCheckerProvider.getTypeChecker(), false);
 
         if (call.getCalleeExpression() == null) return checkArgumentTypesAndFail(context);
@@ -398,7 +396,7 @@ public class CallResolver {
             @Nullable MutableDataFlowInfoForArguments dataFlowInfoForArguments
     ) {
         BasicCallResolutionContext basicCallResolutionContext =
-                BasicCallResolutionContext.create(context, call, CheckValueArgumentsMode.ENABLED, dataFlowInfoForArguments);
+                BasicCallResolutionContext.create(context, call, dataFlowInfoForArguments);
 
         List<ResolutionTask<CallableDescriptor, FunctionDescriptor>> tasks =
                 taskPrioritizer.<CallableDescriptor, FunctionDescriptor>computePrioritizedTasksFromCandidates(
@@ -492,7 +490,7 @@ public class CallResolver {
             @NotNull CallTransformer<D, F> callTransformer,
             @NotNull TracingStrategy tracing
     ) {
-        if (context.checkArguments == CheckValueArgumentsMode.ENABLED) {
+        if (context.resolveArguments != ResolveArgumentsMode.DISABLED) {
             argumentTypeResolver.analyzeArgumentsAndRecordTypes(context);
         }
         Collection<ResolvedCall<F>> allCandidates = Lists.newArrayList();

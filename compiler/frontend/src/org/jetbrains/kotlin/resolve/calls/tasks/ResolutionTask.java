@@ -54,7 +54,6 @@ public class ResolutionTask<D extends CallableDescriptor, F extends D> extends C
             @NotNull JetType expectedType,
             @NotNull DataFlowInfo dataFlowInfo,
             @NotNull ContextDependency contextDependency,
-            @NotNull CheckValueArgumentsMode checkArguments,
             @NotNull ResolutionResultsCache resolutionResultsCache,
             @Nullable MutableDataFlowInfoForArguments dataFlowInfoForArguments,
             @NotNull CallChecker callChecker,
@@ -62,12 +61,14 @@ public class ResolutionTask<D extends CallableDescriptor, F extends D> extends C
             @NotNull AdditionalTypeChecker additionalTypeChecker,
             @NotNull StatementFilter statementFilter,
             @NotNull Collection<MutableResolvedCall<F>> resolvedCalls,
+            @NotNull ResolveArgumentsMode resolveArgumentsMode,
             boolean isAnnotationContext,
             boolean collectAllCandidates,
             boolean insideSafeCallChain
     ) {
-        super(trace, scope, call, expectedType, dataFlowInfo, contextDependency, checkArguments, resolutionResultsCache,
-              dataFlowInfoForArguments, callChecker, symbolUsageValidator, additionalTypeChecker, statementFilter, isAnnotationContext, collectAllCandidates, insideSafeCallChain);
+        super(trace, scope, call, expectedType, dataFlowInfo, contextDependency, resolutionResultsCache,
+              dataFlowInfoForArguments, callChecker, symbolUsageValidator, additionalTypeChecker, statementFilter,
+              resolveArgumentsMode, isAnnotationContext, collectAllCandidates, insideSafeCallChain);
         this.lazyCandidates = lazyCandidates;
         this.resolvedCalls = resolvedCalls;
         this.tracing = tracing;
@@ -80,10 +81,10 @@ public class ResolutionTask<D extends CallableDescriptor, F extends D> extends C
     ) {
         this(lazyCandidates, tracing,
              context.trace, context.scope, context.call,
-             context.expectedType, context.dataFlowInfo, context.contextDependency, context.checkArguments,
+             context.expectedType, context.dataFlowInfo, context.contextDependency,
              context.resolutionResultsCache, context.dataFlowInfoForArguments,
              context.callChecker, context.symbolUsageValidator, context.additionalTypeChecker,
-             context.statementFilter, Lists.<MutableResolvedCall<F>>newArrayList(),
+             context.statementFilter, Lists.<MutableResolvedCall<F>>newArrayList(), context.resolveArguments,
              context.isAnnotationContext, context.collectAllCandidates, context.insideCallChain);
     }
 
@@ -123,14 +124,15 @@ public class ResolutionTask<D extends CallableDescriptor, F extends D> extends C
             @NotNull ContextDependency contextDependency,
             @NotNull ResolutionResultsCache resolutionResultsCache,
             @NotNull StatementFilter statementFilter,
+            @NotNull ResolveArgumentsMode resolveArgumentsMode,
             boolean collectAllCandidates,
             boolean insideSafeCallChain
     ) {
         return new ResolutionTask<D, F>(
-                lazyCandidates, tracing, trace, scope, call, expectedType, dataFlowInfo, contextDependency, checkArguments,
+                lazyCandidates, tracing, trace, scope, call, expectedType, dataFlowInfo, contextDependency,
                 resolutionResultsCache, dataFlowInfoForArguments,
                 callChecker, symbolUsageValidator, additionalTypeChecker,
-                statementFilter, resolvedCalls,
+                statementFilter, resolvedCalls, resolveArgumentsMode,
                 isAnnotationContext, collectAllCandidates, insideSafeCallChain);
     }
 
@@ -140,10 +142,10 @@ public class ResolutionTask<D extends CallableDescriptor, F extends D> extends C
 
     public ResolutionTask<D, F> replaceCall(@NotNull Call newCall) {
         return new ResolutionTask<D, F>(
-                lazyCandidates, tracing, trace, scope, newCall, expectedType, dataFlowInfo, contextDependency, checkArguments,
+                lazyCandidates, tracing, trace, scope, newCall, expectedType, dataFlowInfo, contextDependency,
                 resolutionResultsCache, dataFlowInfoForArguments,
                 callChecker, symbolUsageValidator, additionalTypeChecker,
-                statementFilter, resolvedCalls,
+                statementFilter, resolvedCalls, resolveArguments,
                 isAnnotationContext, collectAllCandidates, insideCallChain);
     }
 

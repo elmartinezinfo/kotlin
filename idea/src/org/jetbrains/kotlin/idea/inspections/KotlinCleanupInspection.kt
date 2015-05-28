@@ -16,8 +16,11 @@
 
 package org.jetbrains.kotlin.idea.inspections
 
+import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.codeInspection.*
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiJavaFile
@@ -31,9 +34,11 @@ import org.jetbrains.kotlin.idea.quickfix.ReplaceObsoleteLabelSyntaxFix
 import org.jetbrains.kotlin.idea.util.ProjectRootsUtil
 import org.jetbrains.kotlin.psi.JetAnnotationEntry
 import org.jetbrains.kotlin.psi.JetFile
-import org.jetbrains.kotlin.psi.JetTreeVisitorVoid
+import org.jetbrains.kotlin.psi.psiUtil.forEachDescendantOfType
 import org.jetbrains.kotlin.psi.psiUtil.getNonStrictParentOfType
+import org.jetbrains.kotlin.psi.psiUtil.parents
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.ErrorsJvm
+import kotlin.properties.Delegates
 
 public class KotlinCleanupInspection(): LocalInspectionTool(), CleanupLocalInspectionTool {
     // required to simplify the inspection registration in tests
@@ -57,17 +62,27 @@ public class KotlinCleanupInspection(): LocalInspectionTool(), CleanupLocalInspe
         }
 
         val diagnostics = analysisResult.bindingContext.getDiagnostics()
-        val problemDescriptors = arrayListOf<ProblemDescriptor>()
-        file.acceptChildren(object: JetTreeVisitorVoid() {
-            override fun visitElement(element: PsiElement) {
-                super.visitElement(element)
-                diagnostics.forElement(element)
-                   .filter { it.isCleanup() }
-                   .map { it.toProblemDescriptor(file, manager) }
-                   .filterNotNullTo(problemDescriptors)
+
+        class ProblemData(val problemDescriptor: ProblemDescriptor, elementToBeInvalidated: PsiElement) {
+            val depth = elementToBeInvalidated.parents(withItself = true).takeWhile { it !is PsiFile }.count()
+        }
+
+        val problems = arrayListOf<ProblemData>()
+        file.forEachDescendantOfType<PsiElement> { element ->
+            for (diagnostic in diagnostics.forElement(element)) {
+                if (diagnostic.isCleanup()) {
+                    val fixes = diagnostic.toCleanupFixes()
+                    if (fixes.isNotEmpty()) {
+                        val problemDescriptor = diagnostic.toProblemDescriptor(fixes, file, manager)
+                        //TODO: not quite correct for multiple
+                        val elementToBeInvalidated = fixes.map { it.elementToBeInvalidated() }.filterNotNull().firstOrNull() ?: element
+                        problems.add(ProblemData(problemDescriptor, elementToBeInvalidated))
+                    }
+                }
             }
-        })
-        return problemDescriptors.toTypedArray()
+        }
+
+        return problems.sortBy { it.depth }.map { it.problemDescriptor }.toTypedArray()
     }
 
     private fun checkJavaFile(file: PsiJavaFile, manager: InspectionManager): Array<out ProblemDescriptor>? {
@@ -90,7 +105,8 @@ public class KotlinCleanupInspection(): LocalInspectionTool(), CleanupLocalInspe
             Errors.UNNECESSARY_SAFE_CALL,
             Errors.USELESS_CAST,
             Errors.USELESS_ELVIS,
-            ErrorsJvm.POSITIONED_VALUE_ARGUMENT_FOR_JAVA_ANNOTATION
+            ErrorsJvm.POSITIONED_VALUE_ARGUMENT_FOR_JAVA_ANNOTATION,
+            Errors.DEPRECATED_SYMBOL_WITH_MESSAGE
     )
 
     private fun Diagnostic.isObsoleteLabel(): Boolean {
@@ -98,17 +114,23 @@ public class KotlinCleanupInspection(): LocalInspectionTool(), CleanupLocalInspe
         return ReplaceObsoleteLabelSyntaxFix.looksLikeObsoleteLabel(annotationEntry)
     }
 
-    private fun Diagnostic.toProblemDescriptor(file: JetFile, manager: InspectionManager): ProblemDescriptor? {
-        val quickFixes = JetPsiChecker.createQuickfixes(this)
-                .filter { it is CleanupFix }
-                .map { IntentionWrapper(it, file) }
+    private fun Diagnostic.toCleanupFixes(): Collection<CleanupFix> {
+        return JetPsiChecker.createQuickfixes(this).filterIsInstance<CleanupFix>()
+    }
 
-        if (quickFixes.isEmpty()) return null
+    private class Wrapper(val intention: IntentionAction, file: JetFile) : IntentionWrapper(intention, file) {
+        override fun invoke(project: Project, editor: Editor?, file: PsiFile?) {
+            if (intention.isAvailable(project, editor, file)) { // we should check isAvailable here because some elements may get invalidated (or other conditions may change)
+                super.invoke(project, editor, file)
+            }
+        }
+    }
 
+    private fun Diagnostic.toProblemDescriptor(fixes: Collection<CleanupFix>, file: JetFile, manager: InspectionManager): ProblemDescriptor {
         return manager.createProblemDescriptor(getPsiElement(),
                                                 DefaultErrorMessages.render(this),
                                                 false,
-                                                quickFixes.toTypedArray(),
+                                                fixes.map { Wrapper(it, file) }.toTypedArray(),
                                                 ProblemHighlightType.GENERIC_ERROR_OR_WARNING)
     }
 }

@@ -30,15 +30,29 @@ class ClassBody (
         val members: List<Member>,
         val companionObjectMembers: List<Member>,
         val lBrace: LBrace,
-        val rBrace: RBrace) {
+        val rBrace: RBrace,
+        val isEnumBody: Boolean) {
 
-    fun append(builder: CodeBuilder) {
+    fun appendTo(builder: CodeBuilder) {
         val membersFiltered = members.filter { !it.isEmpty }
         if (membersFiltered.isEmpty() && companionObjectMembers.isEmpty()) return
 
         builder append " " append lBrace append "\n"
 
-        builder.append(membersFiltered, "\n")
+        if (!isEnumBody) {
+            builder.append(membersFiltered, "\n")
+        }
+        else {
+            val (constants, otherMembers) = membersFiltered.partition { it is EnumConstant }
+
+            builder.append(constants, ",\n")
+
+            if (otherMembers.isNotEmpty() || companionObjectMembers.isNotEmpty()) {
+                builder.append(";\n")
+            }
+
+            builder.append(otherMembers, "\n")
+        }
 
         appendCompanionObject(builder, membersFiltered.isNotEmpty())
 

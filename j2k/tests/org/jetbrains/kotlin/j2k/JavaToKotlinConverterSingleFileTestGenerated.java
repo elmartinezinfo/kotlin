@@ -73,6 +73,18 @@ public class JavaToKotlinConverterSingleFileTestGenerated extends AbstractJavaTo
             doTest(fileName);
         }
 
+        @TestMetadata("javaClassArgument.java")
+        public void testJavaClassArgument() throws Exception {
+            String fileName = JetTestUtils.navigationMetadata("j2k/testData/fileOrElement/annotations/javaClassArgument.java");
+            doTest(fileName);
+        }
+
+        @TestMetadata("javaClassArrayArgument.java")
+        public void testJavaClassArrayArgument() throws Exception {
+            String fileName = JetTestUtils.navigationMetadata("j2k/testData/fileOrElement/annotations/javaClassArrayArgument.java");
+            doTest(fileName);
+        }
+
         @TestMetadata("jetbrainsNotNull.java")
         public void testJetbrainsNotNull() throws Exception {
             String fileName = JetTestUtils.navigationMetadata("j2k/testData/fileOrElement/annotations/jetbrainsNotNull.java");
@@ -1609,6 +1621,18 @@ public class JavaToKotlinConverterSingleFileTestGenerated extends AbstractJavaTo
         @TestMetadata("companionObject.java")
         public void testCompanionObject() throws Exception {
             String fileName = JetTestUtils.navigationMetadata("j2k/testData/fileOrElement/enum/companionObject.java");
+            doTest(fileName);
+        }
+
+        @TestMetadata("constantsWithBody1.java")
+        public void testConstantsWithBody1() throws Exception {
+            String fileName = JetTestUtils.navigationMetadata("j2k/testData/fileOrElement/enum/constantsWithBody1.java");
+            doTest(fileName);
+        }
+
+        @TestMetadata("constantsWithBody2.java")
+        public void testConstantsWithBody2() throws Exception {
+            String fileName = JetTestUtils.navigationMetadata("j2k/testData/fileOrElement/enum/constantsWithBody2.java");
             doTest(fileName);
         }
 

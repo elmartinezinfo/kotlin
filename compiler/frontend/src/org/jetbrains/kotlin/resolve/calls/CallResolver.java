@@ -452,7 +452,7 @@ public class CallResolver {
         if (CallResolverUtil.isInvokeCallOnVariable(context.call)) return;
         if (!results.isSingleResult()) {
             if (results.getResultCode() == INCOMPLETE_TYPE_INFERENCE) {
-                argumentTypeResolver.checkTypesWithNoCallee(context, RESOLVE_FUNCTION_ARGUMENTS);
+                argumentTypeResolver.checkTypesWithNoCallee(context.replaceResolveArgumentsMode(RESOLVE_FUNCTION_ARGUMENTS));
             }
             return;
         }
@@ -479,7 +479,7 @@ public class CallResolver {
     }
 
     private <D extends CallableDescriptor> OverloadResolutionResultsImpl<D> checkArgumentTypesAndFail(BasicCallResolutionContext context) {
-        argumentTypeResolver.checkTypesWithNoCallee(context);
+        argumentTypeResolver.checkTypesWithNoCallee(context.replaceResolveArgumentsMode(SHAPE_FUNCTION_ARGUMENTS));
         return OverloadResolutionResultsImpl.nameNotFound();
     }
 
@@ -533,7 +533,7 @@ public class CallResolver {
         }
         else if (traceForFirstNonemptyCandidateSet == null) {
             tracing.unresolvedReference(context.trace);
-            argumentTypeResolver.checkTypesWithNoCallee(context, SHAPE_FUNCTION_ARGUMENTS);
+            argumentTypeResolver.checkTypesWithNoCallee(context.replaceResolveArgumentsMode(SHAPE_FUNCTION_ARGUMENTS));
             results = OverloadResolutionResultsImpl.<F>nameNotFound();
         }
         else {
@@ -578,7 +578,7 @@ public class CallResolver {
         OverloadResolutionResultsImpl<F> results = ResolutionResultsHandler.INSTANCE.computeResultAndReportErrors(
                 task, task.getResolvedCalls());
         if (!results.isSingleResult() && !results.isIncomplete()) {
-            argumentTypeResolver.checkTypesWithNoCallee(task.toBasic());
+            argumentTypeResolver.checkTypesWithNoCallee(task.toBasic().replaceResolveArgumentsMode(SHAPE_FUNCTION_ARGUMENTS));
         }
         return results;
     }

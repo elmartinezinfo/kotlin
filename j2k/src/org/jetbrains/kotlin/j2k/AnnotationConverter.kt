@@ -43,9 +43,9 @@ class AnnotationConverter(private val converter: Converter) {
                 var child: PsiElement? = modifierList
                 while (true) {
                     child = child!!.getNextSibling()
-                    if (child == null || child!!.getTextLength() != 0) break
+                    if (child == null || child.getTextLength() != 0) break
                 }
-                if (child is PsiWhiteSpace) !child!!.isInSingleLine() else false
+                if (child is PsiWhiteSpace) !child.isInSingleLine() else false
             }
 
             annotations.map { convertAnnotation(it, owner is PsiLocalVariable, newLines) }.filterNotNull() //TODO: brackets are also needed for local classes
@@ -88,11 +88,11 @@ class AnnotationConverter(private val converter: Converter) {
             PsiModifier.TRANSIENT to "transient"
     )
 
-    public fun convertAnnotation(annotation: PsiAnnotation, brackets: Boolean, newLineAfter: Boolean): Annotation? {
+    public fun convertAnnotation(annotation: PsiAnnotation, withAt: Boolean, newLineAfter: Boolean): Annotation? {
         val qualifiedName = annotation.getQualifiedName()
         if (qualifiedName == CommonClassNames.JAVA_LANG_DEPRECATED && annotation.getParameterList().getAttributes().isEmpty()) {
             val deferredExpression = converter.deferredElement<Expression> { LiteralExpression("\"\"").assignNoPrototype() }
-            return Annotation(Identifier("deprecated").assignNoPrototype(), listOf(null to deferredExpression), brackets, newLineAfter).assignPrototype(annotation) //TODO: insert comment
+            return Annotation(Identifier("deprecated").assignNoPrototype(), listOf(null to deferredExpression), withAt, newLineAfter).assignPrototype(annotation) //TODO: insert comment
         }
 
         val nameRef = annotation.getNameReferenceElement()
@@ -111,7 +111,7 @@ class AnnotationConverter(private val converter: Converter) {
 
             attrValues.map { attrName to converter.deferredElement(it) }
         }
-        return Annotation(name, arguments, brackets, newLineAfter).assignPrototype(annotation)
+        return Annotation(name, arguments, withAt, newLineAfter).assignPrototype(annotation)
     }
 
     public fun convertAnnotationMethodDefault(method: PsiAnnotationMethod): DeferredElement<Expression>? {
@@ -121,7 +121,18 @@ class AnnotationConverter(private val converter: Converter) {
 
     private fun convertAttributeValue(value: PsiAnnotationMemberValue?, expectedType: PsiType?, isVararg: Boolean, isUnnamed: Boolean): List<(CodeConverter) -> Expression> {
         when (value) {
-            is PsiExpression -> return listOf({ codeConverter -> codeConverter.convertExpression(value, expectedType).assignPrototype(value) })
+            is PsiExpression -> {
+                return listOf({ codeConverter ->
+                                  val expression = if (value is PsiClassObjectAccessExpression) {
+                                      val typeElement = converter.convertTypeElement(value.getOperand())
+                                      ClassLiteralExpression(typeElement.type.toNotNullType())
+                                  }
+                                  else {
+                                      codeConverter.convertExpression(value, expectedType)
+                                  }
+                                  expression.assignPrototype(value)
+                              })
+            }
 
             is PsiArrayInitializerMemberValue -> {
                 val componentType = (expectedType as? PsiArrayType)?.getComponentType()

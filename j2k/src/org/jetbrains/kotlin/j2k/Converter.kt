@@ -30,6 +30,7 @@ import org.jetbrains.kotlin.j2k.ast.Object
 import org.jetbrains.kotlin.j2k.usageProcessing.FieldToPropertyProcessing
 import org.jetbrains.kotlin.j2k.usageProcessing.UsageProcessing
 import org.jetbrains.kotlin.j2k.usageProcessing.UsageProcessingExpressionConverter
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.types.expressions.OperatorConventions.*
 import java.util.ArrayList
 import java.util.HashMap
@@ -77,8 +78,13 @@ class Converter private(
     private fun createDefaultCodeConverter() = CodeConverter(this, DefaultExpressionConverter(), DefaultStatementConverter(), null)
 
     public data class IntermediateResult(
-            val codeGenerator: (Map<PsiElement, Collection<UsageProcessing>>) -> String,
+            val codeGenerator: (Map<PsiElement, Collection<UsageProcessing>>) -> Result,
             val parseContext: ParseContext
+    )
+
+    public data class Result(
+            val text: String,
+            val importsToAdd: Set<FqName>
     )
 
     public fun convert(): IntermediateResult? {
@@ -93,7 +99,7 @@ class Converter private(
 
                     val builder = CodeBuilder(elementToConvert)
                     builder.append(element)
-                    builder.result
+                    Result(builder.resultText, builder.importsToAdd)
                 },
                 parseContext)
     }
@@ -172,11 +178,13 @@ class Converter private(
         return when {
             psiClass.isInterface() -> {
                 val classBody = ClassBodyConverter(psiClass, this, isOpenClass = false, isObject = false).convertBody()
-                Trait(name, annotations, modifiers, typeParameters, extendsTypes, implementsTypes, classBody)
+                Interface(name, annotations, modifiers, typeParameters, extendsTypes, implementsTypes, classBody)
             }
 
             psiClass.isEnum() -> {
-                val classBody = ClassBodyConverter(psiClass, this, isOpenClass = false, isObject = false).convertBody()
+                modifiers = modifiers.without(Modifier.ABSTRACT)
+                val hasInheritors = psiClass.getFields().any { it is PsiEnumConstant && it.getInitializingClass() != null }
+                val classBody = ClassBodyConverter(psiClass, this, isOpenClass = hasInheritors, isObject = false).convertBody()
                 Enum(name, annotations, modifiers, typeParameters, implementsTypes, classBody)
             }
 
@@ -251,24 +259,24 @@ class Converter private(
                       annotationConverter.convertAnnotationMethodDefault(method)).assignPrototype(method, noBlankLinesInheritance)
         }
 
+        fun convertType(psiType: PsiType?): Type {
+            return typeConverter.convertType(psiType, Nullability.NotNull, inAnnotationType = true)
+        }
+
         val parameters =
                 // Argument named `value` comes first if it exists
                 // Convert it as vararg if it's array
-                methodsNamedValue.
-                map { method ->
+                methodsNamedValue.map { method ->
                     val returnType = method.getReturnType()
                     val typeConverted = if (returnType is PsiArrayType)
-                        VarArgType(typeConverter.convertType(returnType.getComponentType(), Nullability.NotNull))
+                        VarArgType(convertType(returnType.getComponentType()))
                     else
-                        typeConverter.convertType(returnType, Nullability.NotNull)
+                        convertType(returnType)
 
                     createParameter(typeConverted, method)
                 } +
-                otherMethods
-                .map { method ->
-                    val typeConverted = typeConverter.convertType(method.getReturnType(), Nullability.NotNull)
-                    createParameter(typeConverted, method)
-                }
+                otherMethods.map { method -> createParameter(convertType(method.getReturnType()), method) }
+
         val parameterList = ParameterList(parameters).assignNoPrototype()
         val constructorSignature = if (parameterList.parameters.isNotEmpty())
             PrimaryConstructorSignature(Annotations.Empty, Modifiers.Empty, parameterList).assignNoPrototype()
@@ -278,7 +286,7 @@ class Converter private(
         // to convert fields and nested types - they are not allowed in Kotlin but we convert them and let user refactor code
         var classBody = ClassBodyConverter(psiClass, this, isOpenClass = false, isObject = false).convertBody()
         classBody = ClassBody(constructorSignature, classBody.baseClassParams, classBody.members,
-                              classBody.companionObjectMembers, classBody.lBrace, classBody.rBrace)
+                              classBody.companionObjectMembers, classBody.lBrace, classBody.rBrace, classBody.isEnumBody)
 
         val annotationAnnotation = Annotation(Identifier("annotation").assignNoPrototype(), listOf(), false, false).assignNoPrototype()
         return Class(psiClass.declarationIdentifier(),
@@ -307,11 +315,11 @@ class Converter private(
         val name = correction?.identifier ?: field.declarationIdentifier()
         val converted = if (field is PsiEnumConstant) {
             val argumentList = field.getArgumentList()
-            EnumConstant(name,
-                         annotations,
-                         modifiers,
-                         typeConverter.convertType(field.getType(), Nullability.NotNull),
-                         deferredElement { codeConverter -> ExpressionList(codeConverter.convertExpressions(argumentList?.getExpressions() ?: array<PsiExpression>())).assignPrototype(argumentList) })
+            val params = deferredElement { codeConverter ->
+                ExpressionList(codeConverter.convertExpressions(argumentList?.getExpressions() ?: arrayOf<PsiExpression>())).assignPrototype(argumentList)
+            }
+            val body = field.getInitializingClass()?.let { convertAnonymousClassBody(it) }
+            EnumConstant(name, annotations, modifiers, params, body)
         }
         else {
             val isVal = isVal(referenceSearcher, field)
@@ -424,7 +432,7 @@ class Converter private(
             function.annotations += Annotations(
                     listOf(Annotation(Identifier("jvmOverloads").assignNoPrototype(),
                                       listOf(),
-                                      brackets = function is PrimaryConstructor,
+                                      withAt = function is PrimaryConstructor,
                                       newLineAfter = false).assignNoPrototype())).assignNoPrototype()
         }
 
@@ -550,6 +558,11 @@ class Converter private(
     public fun convertModifiers(owner: PsiModifierListOwner): Modifiers {
         return Modifiers(MODIFIERS_MAP.filter { owner.hasModifierProperty(it.first) }.map { it.second })
                 .assignPrototype(owner.getModifierList(), CommentsAndSpacesInheritance(blankLinesBefore = false))
+    }
+
+    public fun convertAnonymousClassBody(anonymousClass: PsiAnonymousClass): AnonymousClassBody {
+        return AnonymousClassBody(ClassBodyConverter(anonymousClass, this, isOpenClass = false, isObject = false).convertBody(),
+                                  anonymousClass.getBaseClassType().resolve()?.isInterface() ?: false).assignPrototype(anonymousClass)
     }
 
     private val MODIFIERS_MAP = listOf(

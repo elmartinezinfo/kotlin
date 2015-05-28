@@ -61,6 +61,12 @@ public class JavaToKotlinCopyPasteConversionTestGenerated extends AbstractJavaTo
         doTest(fileName);
     }
 
+    @TestMetadata("AddKClassImport.java")
+    public void testAddKClassImport() throws Exception {
+        String fileName = JetTestUtils.navigationMetadata("idea/testData/copyPaste/conversion/AddKClassImport.java");
+        doTest(fileName);
+    }
+
     public void testAllFilesPresentInConversion() throws Exception {
         JetTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("idea/testData/copyPaste/conversion"), Pattern.compile("^([^\\.]+)\\.java$"), true);
     }
@@ -92,6 +98,12 @@ public class JavaToKotlinCopyPasteConversionTestGenerated extends AbstractJavaTo
     @TestMetadata("ConversionInCorrectContext.java")
     public void testConversionInCorrectContext() throws Exception {
         String fileName = JetTestUtils.navigationMetadata("idea/testData/copyPaste/conversion/ConversionInCorrectContext.java");
+        doTest(fileName);
+    }
+
+    @TestMetadata("CopyAnnotation.java")
+    public void testCopyAnnotation() throws Exception {
+        String fileName = JetTestUtils.navigationMetadata("idea/testData/copyPaste/conversion/CopyAnnotation.java");
         doTest(fileName);
     }
 

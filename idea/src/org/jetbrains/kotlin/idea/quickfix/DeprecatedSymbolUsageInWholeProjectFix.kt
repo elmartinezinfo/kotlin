@@ -127,17 +127,16 @@ public class DeprecatedSymbolUsageInWholeProjectFix(
 
     private fun replaceUsages(project: Project, usages: Collection<JetSimpleNameExpression>, replacement: ReplaceWithAnnotationAnalyzer.ReplacementExpression) {
         UIUtil.invokeLaterIfNeeded {
-            var replacedCount = 0
             project.executeCommand(getText()) {
                 runWriteAction {
                     for (usage in usages) {
                         try {
                             if (!usage.isValid()) continue // TODO: nested calls
                             val bindingContext = usage.analyze(BodyResolveMode.PARTIAL)
-                            val resolvedCall = element.getResolvedCall(bindingContext) ?: continue
+                            val resolvedCall = usage.getResolvedCall(bindingContext) ?: continue
                             if (!resolvedCall.getStatus().isSuccess()) continue
-                            DeprecatedSymbolUsageFixBase.performReplacement(usage, bindingContext, resolvedCall, replacement)
-                            replacedCount++
+                            // copy replacement expression because it is modified by performReplacement
+                            DeprecatedSymbolUsageFixBase.performReplacement(usage, bindingContext, resolvedCall, replacement.copy())
                         }
                         catch (e: Throwable) {
                             LOG.error(e)
@@ -165,7 +164,7 @@ public class DeprecatedSymbolUsageInWholeProjectFix(
         override fun createAction(diagnostic: Diagnostic): IntentionAction? {
             val nameExpression = diagnostic.getPsiElement() as? JetSimpleNameExpression ?: return null
             val descriptor = Errors.DEPRECATED_SYMBOL_WITH_MESSAGE.cast(diagnostic).getA()
-            val replacement = DeprecatedSymbolUsageFixBase.replaceWithPattern(descriptor) ?: return null
+            val replacement = DeprecatedSymbolUsageFixBase.replaceWithPattern(descriptor, nameExpression.getProject()) ?: return null
             val descriptorName = RENDERER.render(descriptor)
             return DeprecatedSymbolUsageInWholeProjectFix(nameExpression, replacement, "Replace usages of '$descriptorName' in whole project")
         }

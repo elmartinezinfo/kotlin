@@ -76,7 +76,7 @@ public abstract class DeprecatedSymbolUsageFixBase(
         val resolvedCall = element.getResolvedCall(element.analyze()) ?: return false
         if (!resolvedCall.getStatus().isSuccess()) return false
         val descriptor = resolvedCall.getResultingDescriptor()
-        if (replaceWithPattern(descriptor) != replaceWith) return false
+        if (replaceWithPattern(descriptor, project) != replaceWith) return false
 
         try {
             JetPsiFactory(project).createExpression(replaceWith.expression)
@@ -105,7 +105,7 @@ public abstract class DeprecatedSymbolUsageFixBase(
             editor: Editor?)
 
     companion object {
-        public fun replaceWithPattern(descriptor: DeclarationDescriptor): ReplaceWith? {
+        public fun replaceWithPattern(descriptor: DeclarationDescriptor, project: Project): ReplaceWith? {
             val annotationClass = descriptor.builtIns.getDeprecatedAnnotation()
             val annotation = descriptor.getAnnotations().findAnnotation(DescriptorUtils.getFqNameSafe(annotationClass)) ?: return null
             //TODO: code duplication
@@ -118,6 +118,11 @@ public abstract class DeprecatedSymbolUsageFixBase(
             if (pattern.isEmpty()) return null
             val argument = replaceWithValue.getAllValueArguments().entrySet().singleOrNull { it.key.getName().asString() == "imports"/*TODO*/ }?.value
             val imports = (argument?.getValue() as? List<CompileTimeConstant<String>>)?.map { it.getValue() } ?: emptyList()
+
+            // should not be available for descriptors with optional parameters if we cannot fetch default values for them (currently for library with no sources)
+            if (descriptor is CallableDescriptor &&
+                descriptor.getValueParameters().any { it.hasDefaultValue() && OptionalParametersHelper.defaultParameterValue(it, project) == null }) return null
+
             return ReplaceWith(pattern, *imports.toTypedArray())
         }
 
@@ -152,10 +157,6 @@ public abstract class DeprecatedSymbolUsageFixBase(
 
             receiver?.mark(RECEIVER_VALUE_KEY)
 
-            for ((parameter, usages) in replacement.parameterUsages.entrySet()) {
-                usages.forEach { it.put(PARAMETER_USAGE_KEY, parameter) }
-            }
-
             //TODO: this@
             for (thisExpression in replacement.expression.collectDescendantsOfType<JetThisExpression>()) {
                 if (receiver != null) {
@@ -179,8 +180,10 @@ public abstract class DeprecatedSymbolUsageFixBase(
 
                 argument.expression.put(PARAMETER_VALUE_KEY, parameter)
 
-                val originalParameter = parameter.getOriginal()
-                val usages = replacement.expression.collectDescendantsOfType<JetExpression> { it[PARAMETER_USAGE_KEY] == originalParameter }
+                val parameterName = parameter.getName()
+                val usages = replacement.expression.collectDescendantsOfType<JetExpression> {
+                    it[ReplaceWithAnnotationAnalyzer.PARAMETER_USAGE_KEY] == parameterName
+                }
                 usages.forEach {
                     if (argument.isNamed) {
                         (it.getParent() as? JetValueArgument)?.mark(MAKE_ARGUMENT_NAMED_KEY)
@@ -223,7 +226,9 @@ public abstract class DeprecatedSymbolUsageFixBase(
             //TODO: drop import of old function (if not needed anymore)?
 
             val file = result.getContainingJetFile()
-            replacement.descriptorsToImport.forEach { ImportInsertHelper.getInstance(project).importDescriptor(file, it) }
+            replacement.fqNamesToImport
+                    .flatMap { file.getResolutionFacade().resolveImportReference(file, it) }
+                    .forEach { ImportInsertHelper.getInstance(project).importDescriptor(file, it) }
 
             result = postProcessInsertedExpression(result, wrapper.addedStatements)
 
@@ -293,7 +298,6 @@ public abstract class DeprecatedSymbolUsageFixBase(
                 val expression: JetExpression,
                 val wrapped: JetExpression,
                 val expressionType: JetType?,
-                val isDefaultValue: Boolean = false,
                 val isNamed: Boolean = false)
 
         private fun argumentForParameter(
@@ -320,7 +324,7 @@ public abstract class DeprecatedSymbolUsageFixBase(
                     val (expression, parameterUsages) = defaultValue
 
                     for ((param, usages) in parameterUsages) {
-                        usages.forEach { it.put(PARAMETER_USAGE_KEY, param) }
+                        usages.forEach { it.put(ReplaceWithAnnotationAnalyzer.PARAMETER_USAGE_KEY, param.getName()) }
                     }
 
                     // we temporary wrap default values into parenthesis so that we can safely mark them with DEFAULT_PARAMETER_VALUE_KEY
@@ -328,9 +332,9 @@ public abstract class DeprecatedSymbolUsageFixBase(
                     wrapped.mark(DEFAULT_PARAMETER_VALUE_KEY)
 
                     // clean up user data in original
-                    expression.forEachDescendantOfType<JetExpression> { it.clear(PARAMETER_USAGE_KEY) }
+                    expression.forEachDescendantOfType<JetExpression> { it.clear(ReplaceWithAnnotationAnalyzer.PARAMETER_USAGE_KEY) }
 
-                    return Argument(wrapped.getExpression()!!, wrapped, null/*TODO*/, isDefaultValue = true)
+                    return Argument(wrapped.getExpression()!!, wrapped, null/*TODO*/)
                 }
 
                 is VarargValueArgument -> {
@@ -397,7 +401,7 @@ public abstract class DeprecatedSymbolUsageFixBase(
                 // clean up user data
                 it.forEachDescendantOfType<JetExpression> {
                     it.clear(USER_CODE_KEY)
-                    it.clear(PARAMETER_USAGE_KEY)
+                    it.clear(ReplaceWithAnnotationAnalyzer.PARAMETER_USAGE_KEY)
                     it.clear(PARAMETER_VALUE_KEY)
                     it.clear(RECEIVER_VALUE_KEY)
                     it.clear(DEFAULT_PARAMETER_VALUE_KEY)
@@ -589,7 +593,6 @@ public abstract class DeprecatedSymbolUsageFixBase(
 
         // keys below are used on expressions
         private val USER_CODE_KEY = Key<Unit>("USER_CODE")
-        private val PARAMETER_USAGE_KEY = Key<ValueParameterDescriptor>("PARAMETER_USAGE")
         private val PARAMETER_VALUE_KEY = Key<ValueParameterDescriptor>("PARAMETER_VALUE")
         private val RECEIVER_VALUE_KEY = Key<Unit>("RECEIVER_VALUE")
         private val DEFAULT_PARAMETER_VALUE_KEY = Key<Unit>("DEFAULT_PARAMETER_VALUE")

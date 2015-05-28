@@ -22,6 +22,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns;
 import org.jetbrains.kotlin.cfg.WhenChecker;
+import org.jetbrains.kotlin.descriptors.ClassDescriptor;
 import org.jetbrains.kotlin.diagnostics.Errors;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.resolve.BindingContext;
@@ -134,6 +135,14 @@ public class PatternMatchingTypingVisitor extends ExpressionTypingVisitor {
             // Without else expression in non-exhaustive when, we *must* take initial data flow info into account,
             // because data flow can bypass all when branches in this case
             commonDataFlowInfo = commonDataFlowInfo.or(context.dataFlowInfo);
+            // Generation of warnings for statement-like whens (for expression-like another stuff is generated)
+            if (isStatement) {
+                ClassDescriptor enumClassDescriptor = WhenChecker.getClassDescriptorOfTypeIfEnum(
+                        WhenChecker.whenSubjectType(expression, context.trace.getBindingContext()));
+                if (enumClassDescriptor != null && !WhenChecker.isWhenOnEnumExhaustive(expression, context.trace, enumClassDescriptor)) {
+                    context.trace.report(NON_EXHAUSTIVE_WHEN_OVER_ENUM.on(expression));
+                }
+            }
         }
 
         return TypeInfoFactoryPackage.createTypeInfo(expressionTypes.isEmpty() ? null : DataFlowUtils.checkType(

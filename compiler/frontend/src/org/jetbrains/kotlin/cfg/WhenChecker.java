@@ -60,7 +60,7 @@ public final class WhenChecker {
     }
 
     @Nullable
-    private static JetType whenSubjectType(@NotNull JetWhenExpression expression, @NotNull BindingContext context) {
+    public static JetType whenSubjectType(@NotNull JetWhenExpression expression, @NotNull BindingContext context) {
         JetExpression subjectExpression = expression.getSubjectExpression();
         return subjectExpression == null ? null : context.getType(subjectExpression);
     }

@@ -32,10 +32,7 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
-import org.jetbrains.kotlin.psi.psiUtil.forEachDescendantOfType
-import org.jetbrains.kotlin.psi.psiUtil.getReceiverExpression
-import org.jetbrains.kotlin.psi.psiUtil.replaced
+import org.jetbrains.kotlin.psi.psiUtil.*
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils
@@ -54,11 +51,14 @@ import java.util.LinkedHashSet
 data class ReplaceWith(val expression: String, vararg val imports: String)
 
 object ReplaceWithAnnotationAnalyzer {
+    public val PARAMETER_USAGE_KEY: Key<Name> = Key("PARAMETER_USAGE")
+
     public data class ReplacementExpression(
             val expression: JetExpression,
-            val descriptorsToImport: Collection<DeclarationDescriptor>,
-            val parameterUsages: Map<ValueParameterDescriptor, Collection<JetExpression>>
-    )
+            val fqNamesToImport: Collection<FqName>
+    ) {
+        fun copy() = ReplacementExpression(expression.copied(), fqNamesToImport)
+    }
 
     public fun analyze(
             annotation: ReplaceWith,
@@ -84,13 +84,13 @@ object ReplaceWithAnnotationAnalyzer {
         val psiFactory = JetPsiFactory(project)
         var expression = psiFactory.createExpression(annotation.expression)
 
-        val explicitlyImportedSymbols = annotation.imports
+        val importFqNames = annotation.imports
                 .filter { FqNameUnsafe.isValid(it) }
                 .map { FqNameUnsafe(it) }
                 .filter { it.isSafe() }
                 .mapTo(LinkedHashSet<FqName>()) { it.toSafe() }
-                .flatMap { resolutionFacade.resolveImportReference(file, it) }
-        val descriptorsToImport = explicitlyImportedSymbols.toArrayList()
+
+        val explicitlyImportedSymbols = importFqNames.flatMap { resolutionFacade.resolveImportReference(file, it) }
 
         val symbolScope = getResolutionScope(symbolDescriptor)
         val scope = ChainedScope(symbolDescriptor, "ReplaceWith resolution scope", ExplicitImportsScope(explicitlyImportedSymbols), symbolScope)
@@ -99,18 +99,16 @@ object ReplaceWithAnnotationAnalyzer {
 
         val receiversToAdd = ArrayList<Pair<JetExpression, JetExpression>>()
 
-        val parameterUsageKey = Key<ValueParameterDescriptor>("parameterUsageKey")
-
         expression.forEachDescendantOfType<JetSimpleNameExpression> { expression ->
             val target = bindingContext[BindingContext.REFERENCE_TARGET, expression] ?: return@forEachDescendantOfType
 
             if (target.canBeReferencedViaImport() && (target.isExtension || expression.getReceiverExpression() == null)) {
-                descriptorsToImport.addIfNotNull(target)
+                importFqNames.addIfNotNull(target.importableFqName)
             }
 
             if (expression.getReceiverExpression() == null) {
                 if (target is ValueParameterDescriptor && target.getContainingDeclaration() == symbolDescriptor) {
-                    expression.putCopyableUserData(parameterUsageKey, target)
+                    expression.putCopyableUserData(PARAMETER_USAGE_KEY, target.getName())
                 }
 
                 val resolvedCall = expression.getResolvedCall(bindingContext)
@@ -138,15 +136,7 @@ object ReplaceWithAnnotationAnalyzer {
             }
         }
 
-        val parameterUsages = symbolDescriptor.getValueParameters()
-                .map { parameter -> parameter to expression.collectDescendantsOfType<JetExpression> { it.getCopyableUserData(parameterUsageKey) == parameter } }
-                .toMap()
-
-        expression.forEachDescendantOfType<JetExpression> {
-            it.putCopyableUserData(parameterUsageKey, null)
-        }
-
-        return ReplacementExpression(expression, descriptorsToImport, parameterUsages)
+        return ReplacementExpression(expression, importFqNames)
     }
 
     private fun getResolutionScope(descriptor: DeclarationDescriptor): JetScope {

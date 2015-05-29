@@ -41,6 +41,6 @@ public class KotlinParameterStubImpl(
     }
 
     override fun isMutable() = isMutable
-    override fun hasValOrVarNode() = hasValOrVarNode
+    override fun hasValOrVar() = hasValOrVarNode
     override fun hasDefaultValue() = hasDefaultValue
 }

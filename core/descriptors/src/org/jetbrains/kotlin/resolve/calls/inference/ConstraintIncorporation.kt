@@ -16,6 +16,8 @@
 
 package org.jetbrains.kotlin.resolve.calls.inference
 
+import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
+import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.resolve.calls.inference.ConstraintSystemImpl.ConstraintKind.EQUAL
 import org.jetbrains.kotlin.resolve.calls.inference.ConstraintSystemImpl.ConstraintKind.SUB_TYPE
 import org.jetbrains.kotlin.resolve.calls.inference.TypeBounds.Bound
@@ -24,6 +26,8 @@ import org.jetbrains.kotlin.resolve.calls.inference.TypeBounds.BoundKind.EXACT_B
 import org.jetbrains.kotlin.resolve.calls.inference.TypeBounds.BoundKind.LOWER_BOUND
 import org.jetbrains.kotlin.resolve.calls.inference.TypeBounds.BoundKind.UPPER_BOUND
 import org.jetbrains.kotlin.resolve.calls.inference.constraintPosition.CompoundConstraintPosition
+import org.jetbrains.kotlin.resolve.calls.inference.constraintPosition.ConstraintPositionKind
+import org.jetbrains.kotlin.resolve.scopes.JetScope
 import org.jetbrains.kotlin.types.*
 import org.jetbrains.kotlin.types.Variance.INVARIANT
 import org.jetbrains.kotlin.types.Variance.OUT_VARIANCE
@@ -31,9 +35,28 @@ import java.util.ArrayList
 
 fun ConstraintSystemImpl.incorporateConstraint(variable: JetType, constrainingBound: Bound) {
     val typeBounds = getTypeBounds(variable)
+    val variableType = getMyTypeVariable(variable)!!
+
     val bounds = ArrayList(typeBounds.bounds)
     for (variableBound in bounds) {
         addConstraintFromBounds(variableBound, constrainingBound)
+    }
+    val dependentBounds = ArrayList(getDependentBounds(variableType))
+    for (dependentBound in dependentBounds) {
+        val type = JetTypeImpl(Annotations.EMPTY, dependentBound.typeVariable.getTypeConstructor(), false, listOf(), JetScope.Empty)
+        var variance: Variance? = null
+        dependentBound.constrainingType.forEachTypeArgument {
+            typeProjection ->
+            val argument = typeProjection.getType()
+            val argVariance = typeProjection.getProjectionKind()
+            val typeVariable = getMyTypeVariable(argument)
+            if (typeVariable === constrainingBound.typeVariable) {
+                variance = argVariance
+            }
+        }
+        if (variance != null) {
+            addDependentConstraint(type, variance!!, dependentBound, constrainingBound)
+        }
     }
 
     val constrainingType = constrainingBound.constrainingType
@@ -42,25 +65,33 @@ fun ConstraintSystemImpl.incorporateConstraint(variable: JetType, constrainingBo
         addBound(constrainingType, bound)
         return
     }
-    constrainingType.forEachTypeArgument {
+    constrainingType.forEachTypeArgument l@{
         typeProjection ->
         val argument = typeProjection.getType()
         val variance = typeProjection.getProjectionKind()
-        val typeVariable = getMyTypeVariable(argument)
-        if (typeVariable != null) {
-            for (variableBound in getTypeBounds(typeVariable).bounds) {
-                val newKind = computeNewKind(variance, variableBound.kind, constrainingBound.kind)
-                if (newKind != null && variableBound != constrainingBound) {
-                    val newTypeProjection = TypeProjectionImpl(variance, variableBound.constrainingType)
-                    val substitutor = TypeSubstitutor.create(mapOf(typeVariable.getTypeConstructor() to newTypeProjection))
-                    val newConstrainingType = substitutor.substitute(constrainingType, Variance.INVARIANT)!!
-                    val pure = with (this) { newConstrainingType.isPure() }
-                    val position = CompoundConstraintPosition(variableBound.position, constrainingBound.position)
-                    addBound(variable, Bound(newConstrainingType, newKind, position, pure))
-                }
-            }
+        val typeVariable = getMyTypeVariable(argument) ?: return@l
+
+        for (variableBound in getTypeBounds(typeVariable).bounds) {
+            addDependentConstraint(variable, variance, constrainingBound, variableBound)
         }
     }
+}
+
+private fun ConstraintSystemImpl.addDependentConstraint(
+        variable: JetType,
+        variance: Variance,
+        constrainingBound: Bound,
+        variableBound: Bound
+) {
+    val newKind = computeNewKind(variance, variableBound.kind, constrainingBound.kind)
+    if (newKind == null || variableBound == constrainingBound) return
+
+    val newTypeProjection = TypeProjectionImpl(variance, variableBound.constrainingType)
+    val substitutor = TypeSubstitutor.create(mapOf(variableBound.typeVariable.getTypeConstructor() to newTypeProjection))
+    val newConstrainingType = substitutor.substitute(constrainingBound.constrainingType, INVARIANT)!!
+    val pure = with (this) { newConstrainingType.isPure() }
+    val position = CompoundConstraintPosition(variableBound.position, constrainingBound.position)
+    addBound(variable, Bound(newConstrainingType, newKind, position, pure))
 }
 
 fun ConstraintSystemImpl.addConstraintFromBounds(first: Bound, second: Bound) {
@@ -113,5 +144,17 @@ fun TypeProjection.forEachTypeArgument(f: (TypeProjection) -> Unit) {
             argument
         }
         typeProjection.forEachTypeArgument(f)
+    }
+}
+
+fun ConstraintSystemImpl.fixVariables() {
+    for (typeVariable in getTypeVariables()) {
+        val typeBounds = getTypeBounds(typeVariable)
+        typeBounds.fix()
+
+        val value = typeBounds.value ?: continue
+        val type = JetTypeImpl(Annotations.EMPTY, typeVariable.getTypeConstructor(), false, emptyList(), JetScope.Empty)
+
+        addBound(type, TypeBounds.Bound(value, BoundKind.EXACT_BOUND, ConstraintPositionKind.FROM_COMPLETER.position()))
     }
 }

@@ -36,9 +36,15 @@ public class TypeBoundsImpl(
     override val bounds = ArrayList<Bound>()
 
     private var resultValues: Collection<JetType>? = null
+    private var isFixed = false
+
+    public fun fix() {
+        isFixed = true
+    }
 
     public fun addBound(bound: Bound) {
         resultValues = null
+        bound.typeVariable = typeVariable
         bounds.add(bound)
     }
 
@@ -67,7 +73,7 @@ public class TypeBoundsImpl(
             typeBounds.bounds.addAll(bounds)
         }
         else {
-            val typeSubstitutor = createTypeSubstitutor(substituteTypeVariable)
+            val typeSubstitutor = createTypeSubstitutorForBound(substituteTypeVariable)
             bounds.forEach {
                 //todo captured types
                 val substitutedType = if (it.constrainingType.getConstructor().isDenotable()) {
@@ -82,19 +88,6 @@ public class TypeBoundsImpl(
         }
         typeBounds.resultValues = resultValues
         return typeBounds
-    }
-
-    private fun createTypeSubstitutor(substituteTypeVariable: (TypeParameterDescriptor) -> TypeParameterDescriptor?): TypeSubstitutor {
-        return TypeSubstitutor.create(object : TypeSubstitution() {
-            override fun get(key: TypeConstructor): TypeProjection? {
-                val descriptor = key.getDeclarationDescriptor()
-                if (descriptor !is TypeParameterDescriptor) return null
-                val typeParameterDescriptor = substituteTypeVariable(descriptor) ?: return null
-
-                val type = JetTypeImpl(Annotations.EMPTY, typeParameterDescriptor.getTypeConstructor(), false, listOf(), JetScope.Empty)
-                return TypeProjectionImpl(type)
-            }
-        })
     }
 
     public fun filter(condition: (ConstraintPosition) -> Boolean): TypeBoundsImpl {
@@ -197,3 +190,17 @@ public class TypeBoundsImpl(
         return true
     }
 }
+
+fun createTypeSubstitutorForBound(substituteTypeVariable: (TypeParameterDescriptor) -> TypeParameterDescriptor?): TypeSubstitutor {
+    return TypeSubstitutor.create(object : TypeSubstitution() {
+        override fun get(key: TypeConstructor): TypeProjection? {
+            val descriptor = key.getDeclarationDescriptor()
+            if (descriptor !is TypeParameterDescriptor) return null
+            val typeParameterDescriptor = substituteTypeVariable(descriptor) ?: return null
+
+            val type = JetTypeImpl(Annotations.EMPTY, typeParameterDescriptor.getTypeConstructor(), false, listOf(), JetScope.Empty)
+            return TypeProjectionImpl(type)
+        }
+    })
+}
+

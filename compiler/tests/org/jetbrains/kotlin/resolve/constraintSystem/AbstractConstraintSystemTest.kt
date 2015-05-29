@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.resolve.TypeResolver
 import org.jetbrains.kotlin.resolve.calls.inference.ConstraintSystemImpl
 import org.jetbrains.kotlin.resolve.calls.inference.constraintPosition.ConstraintPositionKind.SPECIAL
 import org.jetbrains.kotlin.resolve.calls.inference.constraintPosition.ConstraintPositionKind.TYPE_BOUND_POSITION
+import org.jetbrains.kotlin.resolve.calls.inference.fixVariables
 import org.jetbrains.kotlin.resolve.lazy.JvmResolveUtil
 import org.jetbrains.kotlin.test.ConfigurationKind
 import org.jetbrains.kotlin.test.JetLiteFixture
@@ -99,6 +100,8 @@ abstract public class AbstractConstraintSystemTest() : JetLiteFixture() {
                 MyConstraintKind.EQUAL -> constraintSystem.addConstraint(ConstraintSystemImpl.ConstraintKind.EQUAL, firstType, secondType, position)
             }
         }
+        constraintSystem.fixVariables()
+
         val resultingStatus = Renderers.RENDER_CONSTRAINT_SYSTEM_SHORT.render(constraintSystem)
 
         val resultingSubstitutor = constraintSystem.getResultingSubstitutor()

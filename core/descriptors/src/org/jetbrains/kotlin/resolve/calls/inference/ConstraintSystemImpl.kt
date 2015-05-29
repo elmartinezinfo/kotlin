@@ -53,6 +53,7 @@ public class ConstraintSystemImpl : ConstraintSystem {
     private val localTypeParameters = HashSet<TypeParameterDescriptor>()
     private val localTypeParameterBounds: Map<TypeParameterDescriptor, TypeBoundsImpl>
         get() = typeParameterBounds.filter { localTypeParameters.contains(it.key) }
+    private val dependentBounds = HashMap<TypeParameterDescriptor, MutableCollection<TypeBounds.Bound>>()
 
     private val errors = ArrayList<ConstraintError>()
     public val constraintErrors: List<ConstraintError>
@@ -142,6 +143,19 @@ public class ConstraintSystemImpl : ConstraintSystem {
         type -> type.getConstructor().getDeclarationDescriptor() in getTypeVariables()
     }
 
+    fun JetType.getDependentTypeVariables(): Collection<TypeParameterDescriptor> {
+        val result = ArrayList<TypeParameterDescriptor>()
+        forEachTypeArgument {
+            typeProjection ->
+            val type = typeProjection.getType()
+            val descriptor = type.getConstructor().getDeclarationDescriptor() as? TypeParameterDescriptor
+            if (descriptor in getTypeVariables()) {
+                result.add(descriptor)
+            }
+        }
+        return result
+    }
+
     public fun copy(): ConstraintSystem = createNewConstraintSystemFromThis({ it }, { it.copy() }, { true })
 
     public fun substituteTypeVariables(typeVariablesMap: (TypeParameterDescriptor) -> TypeParameterDescriptor?): ConstraintSystem {
@@ -182,6 +196,27 @@ public class ConstraintSystemImpl : ConstraintSystem {
         for ((typeParameter, typeBounds) in typeParameterBounds) {
             val newTypeParameter = substituteTypeVariable(typeParameter) ?: typeParameter
             newSystem.typeParameterBounds.put(newTypeParameter, replaceTypeBounds(typeBounds))
+        }
+        for ((typeVariable, bounds) in dependentBounds) {
+            if (bounds.isNotEmpty()) {
+                val newBounds = arrayListOf<Bound>()
+                val newTypeVariable = substituteTypeVariable(typeVariable) ?: typeVariable
+                newSystem.dependentBounds.put(newTypeVariable, newBounds)
+                for (bound in bounds) {
+                    val typeSubstitutor = createTypeSubstitutorForBound(substituteTypeVariable)
+                    val substitutedType = if (bound.constrainingType.getConstructor().isDenotable()) {
+                        typeSubstitutor.substitute(bound.constrainingType, Variance.INVARIANT)
+                    }
+                    else {
+                        bound.constrainingType
+                    }
+                    if (newTypeVariable != null && substitutedType != null) {
+                        val newBound = Bound(substitutedType, bound.kind, bound.position, bound.pure)
+                        newBound.typeVariable = substituteTypeVariable(bound.typeVariable) ?: bound.typeVariable
+                        newBounds.add(newBound)
+                    }
+                }
+            }
         }
         newSystem.localTypeParameters.addAll(localTypeParameters.map { substituteTypeVariable(it) ?: it })
         newSystem.errors.addAll(errors.filter { filterConstraintPosition(it.constraintPosition) }.map { it.substituteTypeVariable(substituteTypeVariable) })
@@ -321,6 +356,14 @@ public class ConstraintSystemImpl : ConstraintSystem {
         if (typeBounds.bounds.contains(bound)) return
 
         typeBounds.addBound(bound)
+
+        if (!bound.pure) {
+            for (dependentTypeVariable in bound.constrainingType.getDependentTypeVariables()) {
+                val dependentBounds = dependentBounds.getOrPut(dependentTypeVariable) { arrayListOf() }
+                dependentBounds.add(bound)
+            }
+        }
+
         incorporateConstraint(variable, bound)
     }
 
@@ -387,6 +430,8 @@ public class ConstraintSystemImpl : ConstraintSystem {
     }
 
     override fun getTypeVariables() = typeParameterBounds.keySet()
+
+    fun getDependentBounds(typeVariable: TypeParameterDescriptor): Collection<Bound> = dependentBounds[typeVariable] ?: emptyList()
 
     override fun getTypeBounds(typeVariable: TypeParameterDescriptor): TypeBoundsImpl {
         if (!isMyTypeVariable(typeVariable)) {

@@ -67,7 +67,7 @@ public class CallResolver {
     private TypeResolver typeResolver;
     private CandidateResolver candidateResolver;
     private ArgumentTypeResolver argumentTypeResolver;
-    private FunctionLiteralArgumentResolver functionLiteralArgumentResolver;
+    private GenericCandidateResolver genericCandidateResolver;
     private CallCompleter callCompleter;
     private TaskPrioritizer taskPrioritizer;
     private AdditionalCheckerProvider additionalCheckerProvider;
@@ -93,8 +93,8 @@ public class CallResolver {
     }
 
     @Inject
-    public void setFunctionLiteralArgumentResolver(FunctionLiteralArgumentResolver functionLiteralArgumentResolver) {
-        this.functionLiteralArgumentResolver = functionLiteralArgumentResolver;
+    public void setGenericCandidateResolver(GenericCandidateResolver genericCandidateResolver) {
+        this.genericCandidateResolver = genericCandidateResolver;
     }
 
     @Inject
@@ -459,7 +459,7 @@ public class CallResolver {
 
         CallCandidateResolutionContext<D> candidateContext = CallCandidateResolutionContext.createForCallBeingAnalyzed(
                 results.getResultingCall(), context, tracing);
-        functionLiteralArgumentResolver.completeTypeInferenceDependentOnFunctionLiteralsForCall(candidateContext, false);
+        genericCandidateResolver.completeTypeInferenceDependentOnFunctionLiteralsForCall(candidateContext, false);
     }
 
     private static <F extends CallableDescriptor> void cacheResults(

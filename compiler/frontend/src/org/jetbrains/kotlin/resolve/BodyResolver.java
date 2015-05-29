@@ -371,6 +371,7 @@ public class BodyResolver {
                 }
                 if (descriptor.getKind() != ClassKind.INTERFACE &&
                     descriptor.getUnsubstitutedPrimaryConstructor() != null &&
+                    superClass.getKind() != ClassKind.INTERFACE &&
                     !superClass.getConstructors().isEmpty() &&
                     !ErrorUtils.isError(superClass)
                 ) {
@@ -498,8 +499,7 @@ public class BodyResolver {
 
     private void resolvePrimaryConstructorParameters(@NotNull BodiesResolveContext c) {
         for (Map.Entry<JetClassOrObject, ClassDescriptorWithResolutionScopes> entry : c.getDeclaredClasses().entrySet()) {
-            if (!(entry.getKey() instanceof JetClass)) continue;
-            JetClass klass = (JetClass) entry.getKey();
+            JetClassOrObject klass = entry.getKey();
             ClassDescriptorWithResolutionScopes classDescriptor = entry.getValue();
             ConstructorDescriptor unsubstitutedPrimaryConstructor = classDescriptor.getUnsubstitutedPrimaryConstructor();
 
@@ -534,11 +534,10 @@ public class BodyResolver {
         // Member properties
         Set<JetProperty> processed = Sets.newHashSet();
         for (Map.Entry<JetClassOrObject, ClassDescriptorWithResolutionScopes> entry : c.getDeclaredClasses().entrySet()) {
-            if (!(entry.getKey() instanceof JetClass)) continue;
-            JetClass jetClass = (JetClass) entry.getKey();
+            JetClassOrObject jetClassOrObject = entry.getKey();
             ClassDescriptorWithResolutionScopes classDescriptor = entry.getValue();
 
-            for (JetProperty property : jetClass.getProperties()) {
+            for (JetProperty property : jetClassOrObject.getProperties()) {
                 PropertyDescriptor propertyDescriptor = c.getProperties().get(property);
                 assert propertyDescriptor != null;
 

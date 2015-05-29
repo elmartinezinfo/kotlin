@@ -1065,6 +1065,8 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
     }
 
     private void generateSecondaryConstructor(@NotNull ConstructorDescriptor constructorDescriptor) {
+        if (!canHaveDeclaredConstructors(descriptor)) return;
+
         ConstructorContext constructorContext = context.intoConstructor(constructorDescriptor);
 
         functionCodegen.generateMethod(OtherOrigin(descriptorToDeclaration(constructorDescriptor), constructorDescriptor),

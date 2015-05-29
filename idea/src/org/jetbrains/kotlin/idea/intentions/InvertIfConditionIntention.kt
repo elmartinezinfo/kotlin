@@ -23,6 +23,7 @@ import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.tree.IElementType
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptor
+import org.jetbrains.kotlin.idea.core.replaced
 import org.jetbrains.kotlin.idea.quickfix.moveCaret
 import org.jetbrains.kotlin.idea.util.isUnit
 import org.jetbrains.kotlin.idea.util.psi.patternMatching.matches
@@ -158,7 +159,7 @@ public class InvertIfConditionIntention : JetSelfTargetingIntention<JetIfExpress
     private fun exitStatementExecutedAfter(expression: JetExpression): JetExpression? {
         val parent = expression.getParent()
         if (parent is JetBlockExpression) {
-            val lastStatement = parent.getStatements().lastIsInstanceOrNull<JetExpression>()!!
+            val lastStatement = parent.getStatements().last()
             if (expression == lastStatement) {
                 return exitStatementExecutedAfter(parent)
             }

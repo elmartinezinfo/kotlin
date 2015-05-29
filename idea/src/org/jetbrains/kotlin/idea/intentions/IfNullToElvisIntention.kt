@@ -28,7 +28,7 @@ import org.jetbrains.kotlin.idea.util.isNothing
 import org.jetbrains.kotlin.lexer.JetTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.endOffset
-import org.jetbrains.kotlin.psi.psiUtil.replaced
+import org.jetbrains.kotlin.idea.core.replaced
 import org.jetbrains.kotlin.psi.psiUtil.siblings
 import org.jetbrains.kotlin.psi.psiUtil.startOffset
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
@@ -102,7 +102,7 @@ public class IfNullToElvisIntention : JetSelfTargetingRangeIntention<JetIfExpres
         val then = ifExpression.getThen() ?: return null
 
         if (then is JetBlockExpression) {
-            val statement = then.getStatements().singleOrNull() as? JetExpression ?: return null
+            val statement = then.getStatements().singleOrNull() ?: return null
             return Data(initializer, prevStatement, statement)
         }
         else {

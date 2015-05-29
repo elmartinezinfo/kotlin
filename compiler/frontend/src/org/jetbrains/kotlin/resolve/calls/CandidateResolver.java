@@ -28,6 +28,7 @@ import org.jetbrains.kotlin.descriptors.*;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilPackage;
 import org.jetbrains.kotlin.resolve.*;
+import org.jetbrains.kotlin.resolve.calls.callUtil.CallUtilPackage;
 import org.jetbrains.kotlin.resolve.calls.context.*;
 import org.jetbrains.kotlin.resolve.calls.inference.ConstraintSystem;
 import org.jetbrains.kotlin.resolve.calls.inference.ConstraintSystemImpl;
@@ -320,7 +321,7 @@ public class CandidateResolver {
             TemporaryTraceAndCache temporaryToResolveFunctionLiteral = TemporaryTraceAndCache.create(
                     context, "trace to resolve function literal with expected return type", argumentExpression);
 
-            JetElement statementExpression = JetPsiUtil.getExpressionOrLastStatementInBlock(functionLiteral.getBodyExpression());
+            JetExpression statementExpression = JetPsiUtil.getExpressionOrLastStatementInBlock(functionLiteral.getBodyExpression());
             if (statementExpression == null) return;
             boolean[] mismatch = new boolean[1];
             ObservableBindingTrace errorInterceptingTrace = ExpressionTypingUtils.makeTraceInterceptingTypeMismatch(
@@ -637,7 +638,7 @@ public class CandidateResolver {
         D candidateDescriptor = candidateCall.getCandidateDescriptor();
         if (TypeUtils.dependsOnTypeParameters(receiverParameter.getType(), candidateDescriptor.getTypeParameters())) return SUCCESS;
 
-        boolean safeAccess = isExplicitReceiver && !implicitInvokeCheck && PsiUtilPackage.isExplicitSafeCall(candidateCall.getCall());
+        boolean safeAccess = isExplicitReceiver && !implicitInvokeCheck && CallUtilPackage.isExplicitSafeCall(candidateCall.getCall());
         boolean isSubtypeBySmartCast = SmartCastUtils.isSubTypeBySmartCastIgnoringNullability(
                 receiverArgument, receiverParameter.getType(), context);
         if (!isSubtypeBySmartCast) {

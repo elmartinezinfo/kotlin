@@ -27,7 +27,7 @@ import org.jetbrains.kotlin.idea.refactoring.inline.KotlinInlineValHandler
 import org.jetbrains.kotlin.idea.refactoring.introduce.introduceVariable.KotlinIntroduceVariableHandler
 import org.jetbrains.kotlin.lexer.JetTokens
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.psi.psiUtil.replaced
+import org.jetbrains.kotlin.idea.core.replaced
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.BindingContextUtils
 import org.jetbrains.kotlin.resolve.DescriptorUtils
@@ -53,7 +53,7 @@ fun JetBinaryExpression.expressionComparedToNull(): JetExpression? {
 fun JetExpression.unwrapBlockOrParenthesis(): JetExpression {
     val innerExpression = JetPsiUtil.safeDeparenthesize(this)
     if (innerExpression is JetBlockExpression) {
-        val statement = innerExpression.getStatements().singleOrNull() as? JetExpression ?: return this
+        val statement = innerExpression.getStatements().singleOrNull() ?: return this
         return JetPsiUtil.safeDeparenthesize(statement)
     }
     return innerExpression
